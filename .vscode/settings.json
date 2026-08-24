@@ -1,0 +1,44 @@
+{
+    "[markdown]": {
+        "diffEditor.ignoreTrimWhitespace": false,
+        "editor.formatOnSave": true,
+        "editor.quickSuggestions": {
+            "comments": "off",
+            "other": "off",
+            "strings": "off"
+        },
+        "editor.unicodeHighlight.ambiguousCharacters": false,
+        "editor.unicodeHighlight.invisibleCharacters": false,
+        "editor.wordWrap": "on"
+    },
+    "editor.codeActionsOnSave": {
+        "source.fixAll.markdownlint": "always",
+        "source.organizeImports": "always",
+        "source.organizeLinkDefinitions": "always",
+        "source.removeUnusedImports": "always",
+        "source.sort.json": "always",
+        "source.sortImports": "always"
+    },
+    "editor.formatOnSave": true,
+    "editor.insertSpaces": true,
+    "editor.tabSize": 4,
+    "explorer.compactFolders": true,
+    "explorer.fileNesting.enabled": true,
+    "explorer.fileNesting.patterns": {
+        "*.js": "${capture}.js.map, ${capture}.min.js, ${capture}.d.ts",
+        "*.ts": "${capture}.js, ${capture}.test.ts",
+        "AGENTS.md": "CLAUDE.md, AGENTS.md",
+        "package.json": "package-lock.json, yarn.lock, pnpm-lock.yaml, bun.lockb, bun.lock",
+        "README.md": "SECURITY.md, CODE_OF_CONDUCT.md, LICENSE, .gitignore, .editorconfig, .gitattributes",
+        "tsconfig.json": "tsconfig.*.json",
+        "vitest.config.ts": "vitest.config.ts, vitest.setup.ts"
+    },
+    "files.autoSave": "afterDelay",
+    "files.autoSaveDelay": 1000,
+    "files.encoding": "utf8",
+    "files.eol": "\n",
+    "files.insertFinalNewline": true,
+    "js/ts.experimental.useTsgo": false,
+    "js/ts.format.semicolons": "remove",
+    "js/ts.tsdk.path": "./node_modules/typescript/lib"
+}
