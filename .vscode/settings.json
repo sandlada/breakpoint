@@ -30,8 +30,7 @@
         "AGENTS.md": "CLAUDE.md, AGENTS.md",
         "package.json": "package-lock.json, yarn.lock, pnpm-lock.yaml, bun.lockb, bun.lock",
         "README.md": "SECURITY.md, CODE_OF_CONDUCT.md, LICENSE, .gitignore, .editorconfig, .gitattributes",
-        "tsconfig.json": "tsconfig.*.json",
-        "vitest.config.ts": "vitest.config.ts, vitest.setup.ts"
+        "tsconfig.json": "tsconfig.*.json, tsdown.config.ts, vitest.config.ts, vitest.setup.ts"
     },
     "files.autoSave": "afterDelay",
     "files.autoSaveDelay": 1000,

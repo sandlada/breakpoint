@@ -32,7 +32,13 @@ export type HeightBreakpointMap = Record<string, BreakpointDefinition>
 
 export type BreakpointDimension = 'width' | 'height' | 'both'
 
-export type BreakpointUnit = 'px' | 'rem'
+export type BreakpointUnit =
+    | 'px' | 'rem' | 'em'
+    | 'ex' | 'ch' | 'cap' | 'ic' | 'lh' | 'rlh'
+    | 'vw' | 'vh' | 'vmin' | 'vmax' | 'vi' | 'vb'
+    | 'dvw' | 'dvh' | 'svw' | 'svh' | 'lvw' | 'lvh'
+    | 'cm' | 'mm' | 'in' | 'pt' | 'pc'
+    | '%'
 
 export interface BreakpointState {
     width: number
@@ -47,6 +53,18 @@ export interface BreakpointState {
     currentHeight: string | null
 }
 
+export const REM_BASE = 16
+export const EM_BASE = 16
+
+/** Absolute units → px (96dpi) */
+export const ABSOLUTE_PX: Readonly<Record<string, number>> = {
+    cm: 37.795275591,
+    mm: 3.7795275591,
+    in: 96,
+    pt: 1.3333333333,
+    pc: 16,
+} as const
+
 export interface BreakpointConfig {
     breakpoints?: BreakpointMap
     heightBreakpoints?: HeightBreakpointMap
@@ -54,10 +72,17 @@ export interface BreakpointConfig {
     element?: HTMLElement | null
     defaultMatches?: Record<string, boolean>
     defaultHeightMatches?: Record<string, boolean>
-    /** Unit, defaults to px; rem is reserved for future expansion, currently passed through as string */
+    /**
+     * @deprecated — retained for compat; string conditions already carry unit (e.g. ">= 600px").
+     * Number shorthand always uses px; use remBase/emBase for rem/em conversion.
+     */
     unit?: BreakpointUnit
-    /** Exclusive endpoint step, handles deduplication of < / > in matchMedia, defaults to 0.05 */
+    /** Exclusive endpoint step (px), handles deduplication of < / > in matchMedia, defaults to 0.05 */
     step?: number
+    /** rem -> px conversion base, defaults to 16 */
+    remBase?: number
+    /** em -> px conversion base, defaults to 16 (independent from remBase) */
+    emBase?: number
 }
 
 // ---------------------------------------------------------------------------

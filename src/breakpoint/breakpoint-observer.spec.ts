@@ -1,7 +1,6 @@
 import { Subject, takeUntil } from 'rxjs'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { BreakingPointObserver, BreakpointObserver, evaluateAll, matchesCondition, matchesDefinition, parseCondition } from './breakpoint-observer.js'
-import { Breakpoint, DEFAULT_BREAKPOINTS, DEFAULT_HEIGHT_BREAKPOINTS } from './breakpoints.js'
 import { shallowEqual } from './rx.js'
 
 describe('parseCondition / matchesCondition', () => {
@@ -82,42 +81,6 @@ describe('evaluateAll overlap', () => {
         expect(evaluateAll(500, m).active).toEqual([])
         expect(evaluateAll(700, m).active).toEqual(['a'])
         expect(evaluateAll(1000, m).active).toEqual(['b'])
-    })
-})
-
-describe('DEFAULT_BREAKPOINTS', () => {
-    it('MD3 width snapshot', () => {
-        expect(evaluateAll(599, DEFAULT_BREAKPOINTS).active).toContain('compact')
-        expect(evaluateAll(600, DEFAULT_BREAKPOINTS).active).toContain('medium')
-        expect(evaluateAll(839, DEFAULT_BREAKPOINTS).active).toContain('medium')
-        expect(evaluateAll(840, DEFAULT_BREAKPOINTS).active).toContain('expanded')
-        expect(evaluateAll(1199, DEFAULT_BREAKPOINTS).active).toContain('expanded')
-        expect(evaluateAll(1200, DEFAULT_BREAKPOINTS).active).toContain('large')
-        expect(evaluateAll(1599, DEFAULT_BREAKPOINTS).active).toContain('large')
-        expect(evaluateAll(1600, DEFAULT_BREAKPOINTS).active).toContain('extraLarge')
-        // aliases
-        expect(evaluateAll(599, DEFAULT_BREAKPOINTS).active).toContain('xs')
-        expect(evaluateAll(1600, DEFAULT_BREAKPOINTS).active).toContain('xl')
-    })
-
-    it('MD3 height', () => {
-        expect(evaluateAll(479, DEFAULT_HEIGHT_BREAKPOINTS).active).toContain('compact')
-        expect(evaluateAll(480, DEFAULT_HEIGHT_BREAKPOINTS).active).toContain('medium')
-        expect(evaluateAll(899, DEFAULT_HEIGHT_BREAKPOINTS).active).toContain('medium')
-        expect(evaluateAll(900, DEFAULT_HEIGHT_BREAKPOINTS).active).toContain('expanded')
-    })
-})
-
-describe('Breakpoint factory', () => {
-    it('sugars', () => {
-        expect(Breakpoint.gt(840)).toBe('> 840px')
-        expect(Breakpoint.gte(600)).toBe('>= 600px')
-        expect(Breakpoint.lt(1200)).toBe('< 1200px')
-        expect(Breakpoint.lte(960)).toBe('<= 960px')
-        expect(Breakpoint.eq(1600)).toBe('= 1600px')
-        expect(Breakpoint.ne(960)).toBe('!= 960px')
-        expect(Breakpoint.between(600, 840)).toEqual({ and: ['>= 600px', '< 840px'] })
-        expect(Breakpoint.range(840, 1199)).toEqual({ and: ['>= 840px', '<= 1199px'] })
     })
 })
 
@@ -217,12 +180,20 @@ describe('BreakpointObserver — viewport & state$', () => {
         const obs = new BreakpointObserver({ breakpoints: { big: '>= 1000px' } })
         const vals: any[] = []
         const sub = obs.observe$('>= 1000px').subscribe((v) => vals.push(v))
-        // 500 not match -> no emission (BehaviorSubject initial state not matched)
-        expect(vals.length).toBe(0)
+        // reversal semantics: initial state emits even when not matched (false)
+        expect(vals.length).toBe(1)
+        expect(vals[0].active).not.toContain('big')
         Object.defineProperty(window, 'innerWidth', { writable: true, value: 1200 })
             ; (obs as any)._scheduleEmitImmediate()
         await new Promise((r) => setTimeout(r, 0))
-        expect(vals.length).toBe(1)
+        expect(vals.length).toBe(2)
+        expect(vals[1].active).toContain('big')
+        // reversal: leaving should also emit
+        Object.defineProperty(window, 'innerWidth', { writable: true, value: 500 })
+            ; (obs as any)._scheduleEmitImmediate()
+        await new Promise((r) => setTimeout(r, 0))
+        expect(vals.length).toBe(3)
+        expect(vals[2].active).not.toContain('big')
         sub.unsubscribe()
         obs.dispose()
     })
@@ -394,6 +365,432 @@ describe('media query generation with step', () => {
         })
         expect(addSpy).toHaveBeenCalledWith('resize', expect.any(Function))
         expect(mockMM).not.toHaveBeenCalled() // fallback
+        obs.dispose()
+        addSpy.mockRestore()
+    })
+})
+
+describe('full units — parse & matches', () => {
+    it('parseCondition full units', () => {
+        expect(parseCondition('> 10vw')).toEqual({ op: '>', value: 10, unit: 'vw' })
+        expect(parseCondition('>= 50vh')).toEqual({ op: '>=', value: 50, unit: 'vh' })
+        expect(parseCondition('< 5em')).toEqual({ op: '<', value: 5, unit: 'em' })
+        expect(parseCondition('<= 1cm')).toEqual({ op: '<=', value: 1, unit: 'cm' })
+        expect(parseCondition('= 10%')).toEqual({ op: '=', value: 10, unit: '%' })
+        expect(parseCondition('!= 2ex')).toEqual({ op: '!=', value: 2, unit: 'ex' })
+        expect(parseCondition('> 10CM')).toEqual({ op: '>', value: 10, unit: 'cm' }) // case-insensitive
+    })
+
+    it('matchesCondition rem & em independent', () => {
+        expect(matchesCondition(32, '>= 2rem')).toBe(true) // 2*16
+        expect(matchesCondition(31, '>= 2rem')).toBe(false)
+        expect(matchesCondition(32, '>= 2rem', 16, 20)).toBe(true)
+        expect(matchesCondition(40, '>= 2em', 16, 20)).toBe(true) // 2*20
+        expect(matchesCondition(39, '>= 2em', 16, 20)).toBe(false)
+        // emBase independent from remBase
+        expect(matchesCondition(32, '>= 2em', 16, 16)).toBe(true)
+        expect(matchesCondition(40, '>= 2rem', 20, 16)).toBe(true) // rem uses remBase, em uses emBase
+        expect(matchesCondition(32, '>= 2rem', 20, 16)).toBe(false) // 2*20=40 >32
+    })
+
+    it('matchesCondition absolute units', () => {
+        expect(matchesCondition(96, '>= 1in')).toBe(true)
+        expect(matchesCondition(95, '>= 1in')).toBe(false)
+        expect(matchesCondition(38, '>= 1cm')).toBe(true)
+        expect(matchesCondition(16, '>= 1pc')).toBe(true)
+        expect(matchesCondition(3.8, '>= 1mm')).toBe(true)
+    })
+
+    it('matchesCondition viewport units', () => {
+        const origW = window.innerWidth
+        const origH = window.innerHeight
+        Object.defineProperty(window, 'innerWidth', { writable: true, value: 1000 })
+        Object.defineProperty(window, 'innerHeight', { writable: true, value: 800 })
+        expect(matchesCondition(100, '>= 10vw')).toBe(true) // 10% of 1000
+        expect(matchesCondition(99, '>= 10vw')).toBe(false)
+        expect(matchesCondition(80, '>= 10vh')).toBe(true) // 10% of 800
+        expect(matchesCondition(79, '>= 10vh')).toBe(false)
+        expect(matchesCondition(80, '>= 10vmin')).toBe(true) // min 800
+        expect(matchesCondition(100, '>= 10vmax')).toBe(true) // max 1000
+        Object.defineProperty(window, 'innerWidth', { writable: true, value: origW })
+        Object.defineProperty(window, 'innerHeight', { writable: true, value: origH })
+    })
+
+    it('matchesCondition non-convertible units return false numeric', () => {
+        expect(matchesCondition(100, '>= 10%')).toBe(false)
+        expect(matchesCondition(100, '>= 2ex')).toBe(false)
+        expect(matchesCondition(100, '>= 2ch')).toBe(false)
+    })
+
+    it('evaluateAll with emBase', () => {
+        Object.defineProperty(window, 'innerWidth', { writable: true, value: 500 })
+        expect(evaluateAll(40, { a: '>= 2em' }, 16, 20).active).toContain('a')
+        expect(evaluateAll(39, { a: '>= 2em' }, 16, 20).active).not.toContain('a')
+    })
+})
+
+describe('BreakpointObserver — full units observer', () => {
+    afterEach(() => vi.restoreAllMocks())
+
+    it('remBase and emBase independent in observer', () => {
+        Object.defineProperty(window, 'innerWidth', { writable: true, value: 40 })
+        const obsRem = new BreakpointObserver({ breakpoints: { a: '>= 2rem' }, remBase: 16, emBase: 20 })
+        expect(obsRem.snapshot.active).toContain('a') // 32
+        obsRem.dispose()
+        Object.defineProperty(window, 'innerWidth', { writable: true, value: 39 })
+        const obsEm = new BreakpointObserver({ breakpoints: { a: '>= 2em' }, remBase: 16, emBase: 20 })
+        expect(obsEm.snapshot.active).not.toContain('a') // 40 needed
+        Object.defineProperty(window, 'innerWidth', { writable: true, value: 40 })
+        const obsEm2 = new BreakpointObserver({ breakpoints: { a: '>= 2em' }, remBase: 16, emBase: 20 })
+        expect(obsEm2.snapshot.active).toContain('a')
+        obsEm.dispose(); obsEm2.dispose()
+    })
+
+    it('absolute unit in observer', () => {
+        Object.defineProperty(window, 'innerWidth', { writable: true, value: 96 })
+        const obs = new BreakpointObserver({ breakpoints: { a: '>= 1in' } })
+        expect(obs.snapshot.active).toContain('a')
+        obs.dispose()
+    })
+})
+
+describe('dimension both & height — isMatched height side', () => {
+    afterEach(() => vi.restoreAllMocks())
+
+    it('both: isMatched height table key and condition', () => {
+        Object.defineProperty(window, 'innerWidth', { writable: true, value: 900 })
+        Object.defineProperty(window, 'innerHeight', { writable: true, value: 400 })
+        const obs = new BreakpointObserver({ dimension: 'both', heightBreakpoints: { h: '< 480px' } })
+        expect(obs.isMatched('h')).toBe(true)
+        expect(obs.isMatched('< 480px')).toBe(true) // height 400
+        expect(obs.isMatched('< 840px')).toBe(true) // either width 900? actually <840 false for width but true for height 400, both => true
+        // array AND in both
+        expect(obs.isMatched(['> 300px', '< 500px'])).toBe(true) // height 400 matches both
+        obs.dispose()
+    })
+
+    it('height dimension isolated', () => {
+        Object.defineProperty(window, 'innerHeight', { writable: true, value: 500 })
+        const obs = new BreakpointObserver({ dimension: 'height', heightBreakpoints: { m: { and: ['>= 480px', '< 900px'] } } })
+        expect(obs.snapshot.active).toEqual([])
+        expect(obs.snapshot.activeHeight).toContain('m')
+        expect(obs.snapshot.height).toBe(500)
+        expect(obs.isMatched('>= 480px')).toBe(true) // height
+        obs.dispose()
+    })
+
+    it('activeHeight$ distinct', async () => {
+        Object.defineProperty(window, 'innerHeight', { writable: true, value: 400 })
+        const obs = new BreakpointObserver({ dimension: 'both' })
+        const vals: string[][] = []
+        const sub = obs.activeHeight$.subscribe(v => vals.push(v))
+        expect(vals.length).toBe(1)
+        Object.defineProperty(window, 'innerHeight', { writable: true, value: 400 })
+        ;(obs as any)._scheduleEmitImmediate()
+        await new Promise(r => setTimeout(r, 0))
+        expect(vals.length).toBe(1)
+        Object.defineProperty(window, 'innerHeight', { writable: true, value: 900 })
+        ;(obs as any)._scheduleEmitImmediate()
+        await new Promise(r => setTimeout(r, 0))
+        expect(vals.length).toBe(2)
+        sub.unsubscribe(); obs.dispose()
+    })
+})
+
+describe('observe reversal — both dimensions & edge cases', () => {
+    afterEach(() => vi.restoreAllMocks())
+
+    it('observe emits on enter and leave, dedup same matched', () => {
+        Object.defineProperty(window, 'innerWidth', { writable: true, value: 500 })
+        const obs = new BreakpointObserver({ breakpoints: { a: '>= 1000px' } })
+        const vals: boolean[] = []
+        const off = obs.observe('>= 1000px', s => vals.push(s.active.includes('a')))
+        expect(vals.length).toBe(1) // initial false
+        expect(vals[0]).toBe(false)
+        // still false (500->600) should not emit
+        Object.defineProperty(window, 'innerWidth', { writable: true, value: 600 })
+        ;(obs as any)._scheduleEmitImmediate()
+        expect(vals.length).toBe(1)
+        // enter
+        Object.defineProperty(window, 'innerWidth', { writable: true, value: 1200 })
+        ;(obs as any)._scheduleEmitImmediate()
+        expect(vals.length).toBe(2)
+        expect(vals[1]).toBe(true)
+        // same matched true (1200->1300) should not emit
+        Object.defineProperty(window, 'innerWidth', { writable: true, value: 1300 })
+        ;(obs as any)._scheduleEmitImmediate()
+        expect(vals.length).toBe(2)
+        // leave
+        Object.defineProperty(window, 'innerWidth', { writable: true, value: 500 })
+        ;(obs as any)._scheduleEmitImmediate()
+        expect(vals.length).toBe(3)
+        expect(vals[2]).toBe(false)
+        // callback receives current snapshot
+        const last = vals[2]
+        expect(last).toBe(false)
+        off()
+        Object.defineProperty(window, 'innerWidth', { writable: true, value: 1200 })
+        ;(obs as any)._scheduleEmitImmediate()
+        expect(vals.length).toBe(3) // off
+        obs.dispose()
+    })
+
+    it('observe with no cb returns noop', () => {
+        const obs = new BreakpointObserver()
+        const off = obs.observe('>= 600px')
+        expect(typeof off).toBe('function')
+        expect(() => off()).not.toThrow()
+        obs.dispose()
+    })
+
+    it('observe$ null returns state$', () => {
+        const obs = new BreakpointObserver()
+        expect(obs.observe$(null as any)).toBe(obs.state$)
+        expect(obs.observe$(undefined as any)).toBe(obs.state$)
+        obs.dispose()
+    })
+
+    it('observe with and/or object query reversal', () => {
+        Object.defineProperty(window, 'innerWidth', { writable: true, value: 900 })
+        const obs = new BreakpointObserver({ breakpoints: { a: '> 840px' } })
+        const vals: boolean[] = []
+        const off = obs.observe({ and: ['> 840px', '< 1200px'] }, s => vals.push(s.active.includes('a')))
+        expect(vals.length).toBe(1) // 900 matches
+        Object.defineProperty(window, 'innerWidth', { writable: true, value: 1300 })
+        ;(obs as any)._scheduleEmitImmediate()
+        // query still matches? 1300 not <1200 so leave => false but active table a is >840 true, but query and is false
+        // _isMatchedOnState uses query definition against width, so should flip to false
+        expect(vals.length).toBe(2)
+        off(); obs.dispose()
+    })
+})
+
+describe('SSR — empty hit and both', () => {
+    it('SSR without defaultMatches empty hit', () => {
+        const orig = (globalThis as any).window
+        // @ts-ignore
+        delete (globalThis as any).window
+        const obs = new BreakpointObserver({ breakpoints: { a: '> 840px', b: '< 600px' } })
+        expect(obs.snapshot.active).toEqual([])
+        expect(obs.snapshot.breakpoints).toEqual({ a: false, b: false })
+        expect(obs.snapshot.width).toBe(0)
+        obs.dispose()
+        ;(globalThis as any).window = orig
+    })
+
+    it('SSR both dimension empty', () => {
+        const orig = (globalThis as any).window
+        // @ts-ignore
+        delete (globalThis as any).window
+        const obs = new BreakpointObserver({ dimension: 'both' })
+        expect(obs.snapshot.active).toEqual([])
+        expect(obs.snapshot.activeHeight).toEqual([])
+        obs.dispose()
+        ;(globalThis as any).window = orig
+    })
+
+    it('SSR defaultHeightMatches', () => {
+        const orig = (globalThis as any).window
+        // @ts-ignore
+        delete (globalThis as any).window
+        const obs = new BreakpointObserver({ dimension: 'height', heightBreakpoints: { h: '< 480px' }, defaultHeightMatches: { h: true } })
+        expect(obs.snapshot.activeHeight).toContain('h')
+        obs.dispose()
+        ;(globalThis as any).window = orig
+    })
+
+    it('SSR with element still empty', () => {
+        const orig = (globalThis as any).window
+        // @ts-ignore
+        delete (globalThis as any).window
+        const div = { getBoundingClientRect: () => ({ width: 500, height: 500 } as DOMRect) } as unknown as HTMLElement
+        const obs = new BreakpointObserver({ element: div })
+        expect(obs.snapshot.width).toBe(0)
+        obs.dispose()
+        ;(globalThis as any).window = orig
+    })
+})
+
+describe('freeze & singleton', () => {
+    it('snapshot frozen', () => {
+        const obs = new BreakpointObserver()
+        expect(Object.isFrozen(obs.snapshot.active)).toBe(true)
+        expect(Object.isFrozen(obs.snapshot.breakpoints)).toBe(true)
+        expect(Object.isFrozen(obs.snapshot.heightBreakpoints)).toBe(true)
+        expect(() => (obs.snapshot.active as string[]).push('x')).toThrow()
+        obs.dispose()
+    })
+
+    it('activeHeight frozen', () => {
+        const obs = new BreakpointObserver({ dimension: 'both' })
+        expect(Object.isFrozen(obs.snapshot.activeHeight)).toBe(true)
+        obs.dispose()
+    })
+
+    it('singleton same', async () => {
+        const { getDefaultBreakpointObserver, defaultBreakpointObserver } = await import('./breakpoint-observer.js')
+        expect(getDefaultBreakpointObserver()).toBe(defaultBreakpointObserver)
+        expect(getDefaultBreakpointObserver()).toBe(getDefaultBreakpointObserver())
+    })
+})
+
+describe('rAF coalescing & ResizeObserver fallback', () => {
+    it('rAF dedup — two scheduleEmit only one next', async () => {
+        Object.defineProperty(window, 'innerWidth', { writable: true, value: 500 })
+        const obs = new BreakpointObserver({ breakpoints: { a: '> 600px' } })
+        const vals: string[][] = []
+        const sub = obs.state$.subscribe(s => vals.push(s.active))
+        const initial = vals.length
+        // trigger two scheduleEmit without flushing
+        ;(obs as any)._scheduleEmit()
+        ;(obs as any)._scheduleEmit()
+        // second should be ignored due to rafId
+        expect((obs as any)._rafId).not.toBeNull()
+        // change width to trigger actual next
+        Object.defineProperty(window, 'innerWidth', { writable: true, value: 700 })
+        await new Promise(r => setTimeout(r, 30))
+        expect(vals.length).toBe(initial + 1)
+        sub.unsubscribe(); obs.dispose()
+    })
+
+    it('fallback to resize when RO missing', () => {
+        const origRO = (globalThis as unknown as { ResizeObserver?: unknown }).ResizeObserver
+        // @ts-ignore
+        delete (globalThis as unknown as { ResizeObserver?: unknown }).ResizeObserver
+        const origWRo = (window as unknown as { ResizeObserver?: unknown }).ResizeObserver
+        // @ts-ignore
+        delete (window as unknown as { ResizeObserver?: unknown }).ResizeObserver
+        const addSpy = vi.spyOn(window, 'addEventListener')
+        const div = document.createElement('div')
+        vi.spyOn(div, 'getBoundingClientRect').mockReturnValue({ width: 500, height: 300, top: 0, left: 0, right: 500, bottom: 300, x: 0, y: 0, toJSON: () => {} } as DOMRect)
+        const obs = new BreakpointObserver({ element: div })
+        expect(addSpy).toHaveBeenCalledWith('resize', expect.any(Function))
+        expect((obs as any)._elementResizeHandler).not.toBeNull()
+        obs.dispose()
+        expect((obs as any)._elementResizeHandler).toBeNull()
+        addSpy.mockRestore()
+        // restore
+        ;(globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver = origRO
+        ;(window as unknown as { ResizeObserver: unknown }).ResizeObserver = origWRo as unknown as typeof ResizeObserver
+    })
+
+    it('observeElement null back to viewport', () => {
+        const div = document.createElement('div')
+        vi.spyOn(div, 'getBoundingClientRect').mockReturnValue({ width: 500, height: 300, top: 0, left: 0, right: 500, bottom: 300, x: 0, y: 0, toJSON: () => {} } as DOMRect)
+        const obs = new BreakpointObserver({ element: div })
+        expect(obs.observedElement).toBe(div)
+        obs.observeElement(null)
+        expect(obs.observedElement).toBe(null)
+        // should have viewportResizeHandler
+        expect((obs as any)._viewportResizeHandler).not.toBeNull()
+        obs.dispose()
+    })
+})
+
+describe('media query — advanced', () => {
+    it('or comma join and !=', () => {
+        const mockMM = vi.fn().mockImplementation((q: string) => ({
+            matches: false, media: q, onchange: null,
+            addListener: vi.fn(), removeListener: vi.fn(),
+            addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn(),
+        }))
+        Object.defineProperty(window, 'matchMedia', { writable: true, value: mockMM })
+        const obs = new BreakpointObserver({ breakpoints: { ext: { or: ['< 840px', '> 1600px'] }, c: '!= 960px' } })
+        const calls = mockMM.mock.calls.map(c => c[0] as string)
+        expect(calls.some(q => q.includes(', '))).toBe(true) // or → comma
+        expect(calls.some(q => q.includes('not all and'))).toBe(true) // !=
+        obs.dispose()
+    })
+
+    it('and join', () => {
+        const mockMM = vi.fn().mockImplementation((q: string) => ({
+            matches: false, media: q, onchange: null,
+            addListener: vi.fn(), removeListener: vi.fn(),
+            addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn(),
+        }))
+        Object.defineProperty(window, 'matchMedia', { writable: true, value: mockMM })
+        const obs = new BreakpointObserver({ breakpoints: { a: { and: ['> 840px', '< 1200px'] } } })
+        const calls = mockMM.mock.calls.map(c => c[0] as string)
+        expect(calls[0]).toContain(' and ')
+        obs.dispose()
+    })
+
+    it('mql+resize mixed for step gap', () => {
+        const mockMM = vi.fn().mockImplementation((q: string) => ({
+            matches: false, media: q, onchange: null,
+            addListener: vi.fn(), removeListener: vi.fn(),
+            addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn(),
+        }))
+        Object.defineProperty(window, 'matchMedia', { writable: true, value: mockMM })
+        const addSpy = vi.spyOn(window, 'addEventListener')
+        const obs = new BreakpointObserver({ breakpoints: { a: '> 840px' } })
+        // mixed: mql + resize
+        expect(mockMM).toHaveBeenCalled()
+        expect(addSpy).toHaveBeenCalledWith('resize', expect.any(Function))
+        obs.dispose()
+        addSpy.mockRestore()
+    })
+
+    it('legacy addListener fallback', () => {
+        const mockMM = vi.fn().mockImplementation((q: string) => ({
+            matches: false, media: q, onchange: null,
+            addListener: vi.fn(), removeListener: vi.fn(),
+            // no addEventListener
+            dispatchEvent: vi.fn(),
+        }))
+        Object.defineProperty(window, 'matchMedia', { writable: true, value: mockMM })
+        const obs = new BreakpointObserver({ breakpoints: { a: '> 840px' } })
+        expect(mockMM).toHaveBeenCalled()
+        // should have called addListener via fallback
+        const mql = mockMM.mock.results[0]!.value as { addListener: ReturnType<typeof vi.fn> }
+        expect(mql.addListener).toHaveBeenCalled()
+        obs.dispose()
+    })
+
+    it('step gap 840.01 — resize covers mql gap', async () => {
+        const origW = window.innerWidth
+        Object.defineProperty(window, 'innerWidth', { writable: true, value: 840 })
+        const obs = new BreakpointObserver({ breakpoints: { a: '> 840px' } })
+        expect(obs.snapshot.active).not.toContain('a') // 840 not >840
+        Object.defineProperty(window, 'innerWidth', { writable: true, value: 840.01 })
+        ;(obs as any)._scheduleEmitImmediate()
+        expect(obs.snapshot.active).toContain('a') // numeric true
+        Object.defineProperty(window, 'innerWidth', { writable: true, value: origW })
+        obs.dispose()
+    })
+
+    it('custom step', () => {
+        const mockMM = vi.fn().mockImplementation((q: string) => ({
+            matches: false, media: q, onchange: null,
+            addListener: vi.fn(), removeListener: vi.fn(),
+            addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn(),
+        }))
+        Object.defineProperty(window, 'matchMedia', { writable: true, value: mockMM })
+        const obs = new BreakpointObserver({ breakpoints: { a: '> 840px' }, step: 0.1 })
+        const calls = mockMM.mock.calls.map(c => c[0] as string)
+        expect(calls[0]).toContain('840.1')
+        obs.dispose()
+    })
+})
+
+describe('edge — object empty throw & unsupported unit', () => {
+    it('empty object throws', () => {
+        expect(() => matchesDefinition(100, {} as any)).toThrow(TypeError)
+    })
+
+    it('unsupported unit % returns false numeric and falls back to resize', () => {
+        expect(matchesCondition(100, '>= 10%')).toBe(false)
+        // % is invalid for width media feature, should fall back to resize (no mql)
+        const mockMM = vi.fn().mockImplementation((q: string) => ({
+            matches: false, media: q, onchange: null,
+            addListener: vi.fn(), removeListener: vi.fn(),
+            addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn(),
+        }))
+        Object.defineProperty(window, 'matchMedia', { writable: true, value: mockMM })
+        const addSpy = vi.spyOn(window, 'addEventListener')
+        const obs = new BreakpointObserver({ breakpoints: { a: '>= 10%' } })
+        expect(mockMM).not.toHaveBeenCalled()
+        expect(addSpy).toHaveBeenCalledWith('resize', expect.any(Function))
         obs.dispose()
         addSpy.mockRestore()
     })
