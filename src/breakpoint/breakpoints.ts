@@ -10,7 +10,7 @@
 export type BreakpointCondition = string
 export type BreakpointLogic = 'and' | 'or'
 
-export interface BreakpointObject {
+export interface BreakpointRange {
     min?: number
     max?: number
     minInclusive?: boolean
@@ -19,15 +19,16 @@ export interface BreakpointObject {
     ne?: number
 }
 
+/** @deprecated use BreakpointRange */
+export type BreakpointObject = BreakpointRange
+
 export type BreakpointDefinition =
     | BreakpointCondition
-    | BreakpointCondition[]
     | { and: BreakpointCondition[] }
     | { or: BreakpointCondition[] }
-    | BreakpointObject
-    | number
+    | BreakpointRange
 
-export type BreakpointMap = Record<string, BreakpointDefinition>
+export type WidthBreakpointMap = Record<string, BreakpointDefinition>
 export type HeightBreakpointMap = Record<string, BreakpointDefinition>
 
 export type BreakpointDimension = 'width' | 'height' | 'both'
@@ -43,21 +44,22 @@ export type BreakpointUnit =
 export interface BreakpointState {
     width: number
     height: number
-    active: string[]
-    activeHeight: string[]
-    breakpoints: Readonly<Record<string, boolean>>
-    heightBreakpoints: Readonly<Record<string, boolean>>
+    activeWidthKeys: string[]
+    activeHeightKeys: string[]
+    widthMatches: Readonly<Record<string, boolean>>
+    heightMatches: Readonly<Record<string, boolean>>
     matches: boolean
-    /** Compat: first matched breakpoint */
-    current: string | null
-    currentHeight: string | null
+    primaryWidth: string | null
+    primaryHeight: string | null
 }
 
 export const REM_BASE = 16
 export const EM_BASE = 16
 
+export type AbsoluteUnit = 'cm' | 'mm' | 'in' | 'pt' | 'pc'
+
 /** Absolute units → px (96dpi) */
-export const ABSOLUTE_PX: Readonly<Record<string, number>> = {
+export const ABSOLUTE_PX: Readonly<Record<AbsoluteUnit, number>> = {
     cm: 37.795275591,
     mm: 3.7795275591,
     in: 96,
@@ -66,19 +68,14 @@ export const ABSOLUTE_PX: Readonly<Record<string, number>> = {
 } as const
 
 export interface BreakpointConfig {
-    breakpoints?: BreakpointMap
+    widthBreakpoints?: WidthBreakpointMap
     heightBreakpoints?: HeightBreakpointMap
     dimension?: BreakpointDimension
     element?: HTMLElement | null
-    defaultMatches?: Record<string, boolean>
+    defaultWidthMatches?: Record<string, boolean>
     defaultHeightMatches?: Record<string, boolean>
-    /**
-     * @deprecated — retained for compat; string conditions already carry unit (e.g. ">= 600px").
-     * Number shorthand always uses px; use remBase/emBase for rem/em conversion.
-     */
-    unit?: BreakpointUnit
-    /** Exclusive endpoint step (px), handles deduplication of < / > in matchMedia, defaults to 0.05 */
-    step?: number
+    /** Media-query exclusive endpoint step (px), converts > / < to min-/max- with step. Defaults to 0.05 */
+    mediaQueryExclusiveStep?: number
     /** rem -> px conversion base, defaults to 16 */
     remBase?: number
     /** em -> px conversion base, defaults to 16 (independent from remBase) */
@@ -89,7 +86,7 @@ export interface BreakpointConfig {
 // Default breakpoints (MD3), human-readable string form
 // ---------------------------------------------------------------------------
 
-export const DEFAULT_BREAKPOINTS: BreakpointMap = {
+export const DEFAULT_WIDTH_BREAKPOINTS: WidthBreakpointMap = {
     compact: '< 600px',
     medium: { and: ['>= 600px', '< 840px'] },
     expanded: { and: ['>= 840px', '< 1200px'] },
@@ -132,10 +129,11 @@ export const Breakpoint = {
         `!= ${fmt(value, unit)}`,
 
     /**
-     * between — Left-closed, right-open interval, MD3 semantics
-     * @example between(600, 840) => { and: ['>= 600px','< 840px'] }
+     * interval — Unified interval helper, replaces between/range
+     * @example interval(600, 840) => { and: ['>= 600px','< 840px'] } (MD3 left-closed right-open)
+     * @example interval(840, 1199, { minInclusive:true, maxInclusive:true }) => { and: ['>= 840px','<= 1199px'] }
      */
-    between: (
+    interval: (
         min: number,
         max: number,
         opts: { minInclusive?: boolean; maxInclusive?: boolean; unit?: BreakpointUnit } = {},
@@ -147,15 +145,14 @@ export const Breakpoint = {
     },
 
     /**
-     * range — Closed-interval helper, similar to between but defaults to inclusive on both ends
-     * @example range(840, 1199) => { and: ['>= 840px','<= 1199px'] }
+     * between — Alias to interval for migration, prefer interval
      */
-    range: (
+    between: (
         min: number,
         max: number,
         opts: { minInclusive?: boolean; maxInclusive?: boolean; unit?: BreakpointUnit } = {},
     ): BreakpointDefinition => {
-        const { minInclusive = true, maxInclusive = true, unit = 'px' } = opts
+        const { minInclusive = true, maxInclusive = false, unit = 'px' } = opts
         const left = minInclusive ? `>= ${fmt(min, unit)}` : `> ${fmt(min, unit)}`
         const right = maxInclusive ? `<= ${fmt(max, unit)}` : `< ${fmt(max, unit)}`
         return { and: [left, right] }

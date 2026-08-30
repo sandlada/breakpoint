@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ABSOLUTE_PX, Breakpoint, DEFAULT_BREAKPOINTS, DEFAULT_HEIGHT_BREAKPOINTS, EM_BASE, REM_BASE } from './breakpoints.js'
+import { ABSOLUTE_PX, Breakpoint, DEFAULT_HEIGHT_BREAKPOINTS, DEFAULT_WIDTH_BREAKPOINTS, EM_BASE, REM_BASE } from './breakpoints.js'
 import { evaluateAll } from './breakpoint-observer.js'
 
 describe('breakpoints — REM_BASE / EM_BASE', () => {
@@ -17,19 +17,19 @@ describe('breakpoints — REM_BASE / EM_BASE', () => {
     })
 })
 
-describe('breakpoints — DEFAULT_BREAKPOINTS', () => {
+describe('breakpoints — DEFAULT_WIDTH_BREAKPOINTS', () => {
     it('MD3 width snapshot', () => {
-        expect(evaluateAll(599, DEFAULT_BREAKPOINTS).active).toContain('compact')
-        expect(evaluateAll(600, DEFAULT_BREAKPOINTS).active).toContain('medium')
-        expect(evaluateAll(839, DEFAULT_BREAKPOINTS).active).toContain('medium')
-        expect(evaluateAll(840, DEFAULT_BREAKPOINTS).active).toContain('expanded')
-        expect(evaluateAll(1199, DEFAULT_BREAKPOINTS).active).toContain('expanded')
-        expect(evaluateAll(1200, DEFAULT_BREAKPOINTS).active).toContain('large')
-        expect(evaluateAll(1599, DEFAULT_BREAKPOINTS).active).toContain('large')
-        expect(evaluateAll(1600, DEFAULT_BREAKPOINTS).active).toContain('extraLarge')
+        expect(evaluateAll(599, DEFAULT_WIDTH_BREAKPOINTS).active).toContain('compact')
+        expect(evaluateAll(600, DEFAULT_WIDTH_BREAKPOINTS).active).toContain('medium')
+        expect(evaluateAll(839, DEFAULT_WIDTH_BREAKPOINTS).active).toContain('medium')
+        expect(evaluateAll(840, DEFAULT_WIDTH_BREAKPOINTS).active).toContain('expanded')
+        expect(evaluateAll(1199, DEFAULT_WIDTH_BREAKPOINTS).active).toContain('expanded')
+        expect(evaluateAll(1200, DEFAULT_WIDTH_BREAKPOINTS).active).toContain('large')
+        expect(evaluateAll(1599, DEFAULT_WIDTH_BREAKPOINTS).active).toContain('large')
+        expect(evaluateAll(1600, DEFAULT_WIDTH_BREAKPOINTS).active).toContain('extraLarge')
         // aliases
-        expect(evaluateAll(599, DEFAULT_BREAKPOINTS).active).toContain('xs')
-        expect(evaluateAll(1600, DEFAULT_BREAKPOINTS).active).toContain('xl')
+        expect(evaluateAll(599, DEFAULT_WIDTH_BREAKPOINTS).active).toContain('xs')
+        expect(evaluateAll(1600, DEFAULT_WIDTH_BREAKPOINTS).active).toContain('xl')
     })
 
     it('MD3 height', () => {
@@ -40,27 +40,40 @@ describe('breakpoints — DEFAULT_BREAKPOINTS', () => {
     })
 
     it('structure — string form', () => {
-        expect(DEFAULT_BREAKPOINTS.compact).toBe('< 600px')
-        expect(DEFAULT_BREAKPOINTS.extraLarge).toBe('>= 1600px')
-        expect(DEFAULT_BREAKPOINTS.medium).toEqual({ and: ['>= 600px', '< 840px'] })
+        expect(DEFAULT_WIDTH_BREAKPOINTS.compact).toBe('< 600px')
+        expect(DEFAULT_WIDTH_BREAKPOINTS.extraLarge).toBe('>= 1600px')
+        expect(DEFAULT_WIDTH_BREAKPOINTS.medium).toEqual({ and: ['>= 600px', '< 840px'] })
         expect(DEFAULT_HEIGHT_BREAKPOINTS.compact).toBe('< 480px')
         expect(DEFAULT_HEIGHT_BREAKPOINTS.expanded).toBe('>= 900px')
     })
 
     it('aliases map to same numeric intervals', () => {
-        // xs should equal compact, sm == medium etc. — evaluated identically
         const cases: Array<[number, string, string]> = [
-            [599, 'compact', 'xs'],
+            [0, 'compact', 'xs'],
+            [599.9, 'compact', 'xs'],
             [600, 'medium', 'sm'],
+            [839.9, 'medium', 'sm'],
             [840, 'expanded', 'md'],
+            [1199.9, 'expanded', 'md'],
             [1200, 'large', 'lg'],
+            [1599.9, 'large', 'lg'],
             [1600, 'extraLarge', 'xl'],
+            [3840, 'extraLarge', 'xl'],
         ]
         for (const [w, a, alias] of cases) {
-            const active = evaluateAll(w, DEFAULT_BREAKPOINTS).active
+            const active = evaluateAll(w, DEFAULT_WIDTH_BREAKPOINTS).active
             expect(active).toContain(a)
             expect(active).toContain(alias)
         }
+    })
+
+    it('MD3 height boundary checks', () => {
+        expect(evaluateAll(0, DEFAULT_HEIGHT_BREAKPOINTS).active).toContain('compact')
+        expect(evaluateAll(479.9, DEFAULT_HEIGHT_BREAKPOINTS).active).toContain('compact')
+        expect(evaluateAll(480, DEFAULT_HEIGHT_BREAKPOINTS).active).toContain('medium')
+        expect(evaluateAll(899.9, DEFAULT_HEIGHT_BREAKPOINTS).active).toContain('medium')
+        expect(evaluateAll(900, DEFAULT_HEIGHT_BREAKPOINTS).active).toContain('expanded')
+        expect(evaluateAll(2160, DEFAULT_HEIGHT_BREAKPOINTS).active).toContain('expanded')
     })
 })
 
@@ -72,8 +85,20 @@ describe('breakpoints — Breakpoint factory', () => {
         expect(Breakpoint.lte(960)).toBe('<= 960px')
         expect(Breakpoint.eq(1600)).toBe('= 1600px')
         expect(Breakpoint.ne(960)).toBe('!= 960px')
+        expect(Breakpoint.interval(600, 840)).toEqual({ and: ['>= 600px', '< 840px'] })
         expect(Breakpoint.between(600, 840)).toEqual({ and: ['>= 600px', '< 840px'] })
-        expect(Breakpoint.range(840, 1199)).toEqual({ and: ['>= 840px', '<= 1199px'] })
+        expect(Breakpoint.interval(840, 1199, { minInclusive: true, maxInclusive: true })).toEqual({ and: ['>= 840px', '<= 1199px'] })
+    })
+
+    it('zero and float values in factory', () => {
+        expect(Breakpoint.gt(0)).toBe('> 0px')
+        expect(Breakpoint.gte(0.5, 'rem')).toBe('>= 0.5rem')
+        expect(Breakpoint.lt(0)).toBe('< 0px')
+        expect(Breakpoint.lte(12.75, 'em')).toBe('<= 12.75em')
+        expect(Breakpoint.eq(0)).toBe('= 0px')
+        expect(Breakpoint.ne(0)).toBe('!= 0px')
+        expect(Breakpoint.interval(0, 100)).toEqual({ and: ['>= 0px', '< 100px'] })
+        expect(Breakpoint.interval(0.5, 2.5, { minInclusive: true, maxInclusive: true, unit: 'rem' })).toEqual({ and: ['>= 0.5rem', '<= 2.5rem'] })
     })
 
     it('custom unit', () => {
@@ -83,24 +108,27 @@ describe('breakpoints — Breakpoint factory', () => {
         expect(Breakpoint.lte(10, 'vh')).toBe('<= 10vh')
         expect(Breakpoint.eq(10, 'cm')).toBe('= 10cm')
         expect(Breakpoint.ne(10, '%')).toBe('!= 10%')
-        expect(Breakpoint.between(10, 20, { unit: 'rem' })).toEqual({ and: ['>= 10rem', '< 20rem'] })
-        expect(Breakpoint.between(10, 20, { unit: 'em' })).toEqual({ and: ['>= 10em', '< 20em'] })
-        expect(Breakpoint.range(10, 20, { unit: 'rem' })).toEqual({ and: ['>= 10rem', '<= 20rem'] })
-        expect(Breakpoint.range(10, 20, { unit: 'vw' })).toEqual({ and: ['>= 10vw', '<= 20vw'] })
+        expect(Breakpoint.interval(10, 20, { unit: 'rem' })).toEqual({ and: ['>= 10rem', '< 20rem'] })
+        expect(Breakpoint.interval(10, 20, { unit: 'em' })).toEqual({ and: ['>= 10em', '< 20em'] })
+        expect(Breakpoint.interval(10, 20, { minInclusive: true, maxInclusive: true, unit: 'rem' })).toEqual({ and: ['>= 10rem', '<= 20rem'] })
+        expect(Breakpoint.interval(10, 20, { minInclusive: true, maxInclusive: true, unit: 'vw' })).toEqual({ and: ['>= 10vw', '<= 20vw'] })
     })
 
-    it('between / range inclusiveness options', () => {
-        expect(Breakpoint.between(600, 840, { minInclusive: false })).toEqual({ and: ['> 600px', '< 840px'] })
-        expect(Breakpoint.between(600, 840, { maxInclusive: true })).toEqual({ and: ['>= 600px', '<= 840px'] })
-        expect(Breakpoint.between(600, 840, { minInclusive: false, maxInclusive: false })).toEqual({ and: ['> 600px', '< 840px'] })
-        expect(Breakpoint.between(600, 840, { minInclusive: false, maxInclusive: true, unit: 'em' })).toEqual({ and: ['> 600em', '<= 840em'] })
-        expect(Breakpoint.range(600, 840, { minInclusive: false, maxInclusive: false })).toEqual({ and: ['> 600px', '< 840px'] })
-        expect(Breakpoint.range(600, 840)).toEqual({ and: ['>= 600px', '<= 840px'] })
-        expect(Breakpoint.range(600, 840, { unit: 'vh' })).toEqual({ and: ['>= 600vh', '<= 840vh'] })
+    it('interval inclusiveness options', () => {
+        expect(Breakpoint.interval(600, 840, { minInclusive: false })).toEqual({ and: ['> 600px', '< 840px'] })
+        expect(Breakpoint.interval(600, 840, { maxInclusive: true })).toEqual({ and: ['>= 600px', '<= 840px'] })
+        expect(Breakpoint.interval(600, 840, { minInclusive: false, maxInclusive: false })).toEqual({ and: ['> 600px', '< 840px'] })
+        expect(Breakpoint.interval(600, 840, { minInclusive: false, maxInclusive: true, unit: 'em' })).toEqual({ and: ['> 600em', '<= 840em'] })
+        expect(Breakpoint.interval(600, 840, { minInclusive: true, maxInclusive: true })).toEqual({ and: ['>= 600px', '<= 840px'] })
+        expect(Breakpoint.interval(600, 840, { minInclusive: true, maxInclusive: true, unit: 'vh' })).toEqual({ and: ['>= 600vh', '<= 840vh'] })
     })
 
     it('factory covers all operators with full units', () => {
-        const units: Array<import('./breakpoints.js').BreakpointUnit> = ['px', 'rem', 'em', 'vw', 'vh', 'vmin', 'vmax', 'cm', 'mm', 'in', 'pt', 'pc', '%', 'ex', 'ch']
+        const units: Array<import('./breakpoints.js').BreakpointUnit> = [
+            'px', 'rem', 'em', 'ex', 'ch', 'cap', 'ic', 'lh', 'rlh',
+            'vw', 'vh', 'vmin', 'vmax', 'vi', 'vb', 'dvw', 'dvh', 'svw', 'svh', 'lvw', 'lvh',
+            'cm', 'mm', 'in', 'pt', 'pc', '%',
+        ]
         for (const u of units) {
             expect(Breakpoint.gt(10, u)).toBe(`> 10${u}`)
             expect(Breakpoint.gte(10, u)).toBe(`>= 10${u}`)

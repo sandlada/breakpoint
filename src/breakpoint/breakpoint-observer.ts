@@ -11,19 +11,21 @@ import {
     shareReplay,
 } from 'rxjs'
 import {
+    ABSOLUTE_PX,
     type BreakpointCondition,
     type BreakpointConfig,
     type BreakpointDefinition,
     type BreakpointDimension,
-    type BreakpointMap,
     type BreakpointState,
-    DEFAULT_BREAKPOINTS,
     DEFAULT_HEIGHT_BREAKPOINTS,
+    DEFAULT_WIDTH_BREAKPOINTS,
     EM_BASE,
+    type HeightBreakpointMap,
     REM_BASE,
+    type WidthBreakpointMap,
 } from './breakpoints.js'
-import { shallowEqual } from './rx.js'
-import { canUseMatchMedia, canUseRequestAnimationFrame, canUseResizeObserver, getWindow, isServer } from './is-server.js'
+import { isShallowEqualArray } from './rx.js'
+import { canUseMatchMedia, canUseResizeObserver, getWindow, isServer } from './is-server.js'
 
 // ---------------------------------------------------------------------------
 // Pure functions: parsing / matching
@@ -54,11 +56,12 @@ function toPx(target: number, unit: ParsedUnit, remBase: number, emBase: number)
         case 'px': return target
         case 'rem': return target * remBase
         case 'em': return target * emBase
-        case 'cm': return target * 37.795275591
-        case 'mm': return target * 3.7795275591
-        case 'in': return target * 96
-        case 'pt': return target * 1.3333333333
-        case 'pc': return target * 16
+        case 'cm':
+        case 'mm':
+        case 'in':
+        case 'pt':
+        case 'pc':
+            return target * ABSOLUTE_PX[unit]
         case 'vw':
         case 'dvw':
         case 'svw':
@@ -121,23 +124,15 @@ export function matchesCondition(value: number, cond: string, remBase: number = 
     }
 }
 
-function isBreakpointObject(def: unknown): def is { min?: number; max?: number; minInclusive?: boolean; maxInclusive?: boolean; eq?: number; ne?: number } {
-    return typeof def === 'object' && def !== null && !Array.isArray(def) && !('and' in (def as Record<string, unknown>)) && !('or' in (def as Record<string, unknown>))
+function isBreakpointRange(def: unknown): def is { min?: number; max?: number; minInclusive?: boolean; maxInclusive?: boolean; eq?: number; ne?: number } {
+    return typeof def === 'object' && def !== null && !('and' in (def as Record<string, unknown>)) && !('or' in (def as Record<string, unknown>))
 }
 
 export function matchesDefinition(value: number, def: BreakpointDefinition, remBase: number = REM_BASE, emBase: number = EM_BASE): boolean {
-    if (typeof def === 'number') {
-        return value >= def
-    }
     if (typeof def === 'string') {
         return matchesCondition(value, def, remBase, emBase)
     }
-    if (Array.isArray(def)) {
-        // Default AND
-        return def.every((c) => matchesCondition(value, c, remBase, emBase))
-    }
-    if (isBreakpointObject(def)) {
-        // Empty object is invalid — previously returned true, now throws to surface logic error
+    if (isBreakpointRange(def)) {
         if (def.min === undefined && def.max === undefined && def.eq === undefined && def.ne === undefined) {
             throw new TypeError(`Invalid breakpoint definition: empty object`)
         }
@@ -167,7 +162,7 @@ export function matchesDefinition(value: number, def: BreakpointDefinition, remB
 
 export function evaluateAll(
     value: number,
-    map: BreakpointMap,
+    map: WidthBreakpointMap | HeightBreakpointMap,
     remBase: number = REM_BASE,
     emBase: number = EM_BASE,
 ): { active: string[]; table: Record<string, boolean> } {
@@ -186,7 +181,6 @@ export function evaluateAll(
 // ---------------------------------------------------------------------------
 
 function toFixedTrim(n: number): string {
-    // Keep up to 4 decimal places to preserve custom step precision; trim trailing zeros
     const s = n.toFixed(4)
     return s.replace(/\.?0+$/, '')
 }
@@ -197,32 +191,27 @@ const INVALID_MEDIA_UNITS = new Set(['%', 'ex', 'ch', 'cap', 'ic', 'lh', 'rlh'])
 function conditionToMediaQuery(
     cond: string,
     dimension: 'width' | 'height',
-    step: number,
+    mediaQueryExclusiveStep: number,
 ): string | null {
     try {
         const { op, value, unit } = parseCondition(cond)
         const u = unit ?? 'px'
         if (INVALID_MEDIA_UNITS.has(u)) return null
-        // step is px-based; only apply for px to avoid rem/vw drift (0.05px != 0.05rem)
         const isPx = u === 'px'
+        if (!isPx && (op === '>' || op === '<')) return null
         switch (op) {
             case '>=':
                 return `(min-${dimension}: ${toFixedTrim(value)}${u})`
             case '>':
-                return isPx
-                    ? `(min-${dimension}: ${toFixedTrim(value + step)}${u})`
-                    : `(min-${dimension}: ${toFixedTrim(value)}${u})`
+                return `(min-${dimension}: ${toFixedTrim(value + mediaQueryExclusiveStep)}${u})`
             case '<=':
                 return `(max-${dimension}: ${toFixedTrim(value)}${u})`
             case '<':
-                return isPx
-                    ? `(max-${dimension}: ${toFixedTrim(value - step)}${u})`
-                    : `(max-${dimension}: ${toFixedTrim(value)}${u})`
+                return `(max-${dimension}: ${toFixedTrim(value - mediaQueryExclusiveStep)}${u})`
             case '=':
             case '==':
                 return `(${dimension}: ${toFixedTrim(value)}${u})`
             case '!=':
-                // not all and (width: 960px) — spec-correct per MQ3
                 return `not all and (${dimension}: ${toFixedTrim(value)}${u})`
             default:
                 return null
@@ -235,38 +224,25 @@ function conditionToMediaQuery(
 function definitionToMediaQuery(
     def: BreakpointDefinition,
     dimension: 'width' | 'height',
-    step: number,
+    mediaQueryExclusiveStep: number,
 ): string | null {
     if (typeof def === 'string') {
-        return conditionToMediaQuery(def, dimension, step)
+        return conditionToMediaQuery(def, dimension, mediaQueryExclusiveStep)
     }
-    if (typeof def === 'number') {
-        // Shorthand >=value
-        return `(min-${dimension}: ${toFixedTrim(def)}px)`
-    }
-    if (Array.isArray(def)) {
-        const parts = def.map((c) => conditionToMediaQuery(c, dimension, step))
-        if (parts.some((p) => p === null)) return null
-        // AND join
-        return (parts as string[]).join(' and ')
-    }
-    if (isBreakpointObject(def)) {
-        // Object/number cannot be precisely expressed as a single media query, fallback to numeric evaluation
-        // Could try converting min/max to media queries, but for simplicity and precision, fallback directly
+    if (isBreakpointRange(def)) {
         return null
     }
     if (typeof def === 'object' && def !== null) {
         if ('and' in def) {
             const arr = (def as { and: BreakpointCondition[] }).and
-            const parts = arr.map((c) => conditionToMediaQuery(c, dimension, step))
+            const parts = arr.map((c) => conditionToMediaQuery(c, dimension, mediaQueryExclusiveStep))
             if (parts.some((p) => p === null)) return null
             return (parts as string[]).join(' and ')
         }
         if ('or' in def) {
             const arr = (def as { or: BreakpointCondition[] }).or
-            const parts = arr.map((c) => conditionToMediaQuery(c, dimension, step))
+            const parts = arr.map((c) => conditionToMediaQuery(c, dimension, mediaQueryExclusiveStep))
             if (parts.some((p) => p === null)) return null
-            // media query OR uses comma
             return (parts as string[]).join(', ')
         }
     }
@@ -282,13 +258,6 @@ function getRaf(): (cb: FrameRequestCallback) => number {
     if (w && typeof w.requestAnimationFrame === 'function') {
         return w.requestAnimationFrame.bind(w)
     }
-    if (typeof globalThis !== 'undefined' && typeof (globalThis as unknown as { requestAnimationFrame?: typeof requestAnimationFrame }).requestAnimationFrame === 'function') {
-        return (globalThis as unknown as { requestAnimationFrame: typeof requestAnimationFrame }).requestAnimationFrame
-    }
-    if (canUseRequestAnimationFrame()) {
-        const win = getWindow()
-        if (win) return win.requestAnimationFrame.bind(win)
-    }
     return (cb: FrameRequestCallback) => setTimeout(() => cb(Date.now()), 16) as unknown as number
 }
 
@@ -296,9 +265,6 @@ function getCancelRaf(): (id: number) => void {
     const w = getWindow()
     if (w && typeof w.cancelAnimationFrame === 'function') {
         return w.cancelAnimationFrame.bind(w)
-    }
-    if (typeof globalThis !== 'undefined' && typeof (globalThis as unknown as { cancelAnimationFrame?: typeof cancelAnimationFrame }).cancelAnimationFrame === 'function') {
-        return (globalThis as unknown as { cancelAnimationFrame: typeof cancelAnimationFrame }).cancelAnimationFrame
     }
     return (id: number) => clearTimeout(id)
 }
@@ -316,12 +282,12 @@ function statesEqual(a: BreakpointState, b: BreakpointState): boolean {
         a.width === b.width &&
         a.height === b.height &&
         a.matches === b.matches &&
-        a.current === b.current &&
-        a.currentHeight === b.currentHeight &&
-        shallowEqual(a.active, b.active) &&
-        shallowEqual(a.activeHeight, b.activeHeight) &&
-        shallowEqualRecord(a.breakpoints, b.breakpoints) &&
-        shallowEqualRecord(a.heightBreakpoints, b.heightBreakpoints)
+        a.primaryWidth === b.primaryWidth &&
+        a.primaryHeight === b.primaryHeight &&
+        isShallowEqualArray(a.activeWidthKeys, b.activeWidthKeys) &&
+        isShallowEqualArray(a.activeHeightKeys, b.activeHeightKeys) &&
+        shallowEqualRecord(a.widthMatches, b.widthMatches) &&
+        shallowEqualRecord(a.heightMatches, b.heightMatches)
     )
 }
 
@@ -330,54 +296,50 @@ function statesEqual(a: BreakpointState, b: BreakpointState): boolean {
 // ---------------------------------------------------------------------------
 
 export class BreakpointObserver {
-    static readonly defaultBreakpoints = DEFAULT_BREAKPOINTS
+    static readonly defaultWidthBreakpoints = DEFAULT_WIDTH_BREAKPOINTS
     static readonly defaultHeightBreakpoints = DEFAULT_HEIGHT_BREAKPOINTS
 
     private _config: Required<BreakpointConfig>
     private _element: HTMLElement | null
     private _stateSubject: BehaviorSubject<BreakpointState>
     readonly state$: Observable<BreakpointState>
-    readonly active$: Observable<string[]>
-    readonly activeHeight$: Observable<string[]>
+    readonly activeWidthKeys$: Observable<string[]>
+    readonly activeHeightKeys$: Observable<string[]>
 
     // viewport
     private _mqlMap = new Map<string, { mql: MediaQueryList; handler: () => void; query: string }>()
     private _viewportResizeHandler: (() => void) | null = null
-    /** @deprecated compat — kept as getter/setter alias to _viewportResizeHandler */
-    private get _resizeHandler(): (() => void) | null { return this._viewportResizeHandler }
-    private set _resizeHandler(v: (() => void) | null) { this._viewportResizeHandler = v }
     private _elementResizeHandler: (() => void) | null = null
     private _rafId: number | null = null
 
     // element
     private _ro: ResizeObserver | null = null
     private _observedEl: HTMLElement | null = null
+    private _lastContentRect: { width: number; height: number } | null = null
 
     private _disposed = false
 
     constructor(config: BreakpointConfig = {}) {
         const {
-            breakpoints = DEFAULT_BREAKPOINTS,
+            widthBreakpoints = DEFAULT_WIDTH_BREAKPOINTS,
             heightBreakpoints = DEFAULT_HEIGHT_BREAKPOINTS,
             dimension = 'width',
             element = null,
-            defaultMatches,
+            defaultWidthMatches,
             defaultHeightMatches,
-            unit = 'px',
-            step = 0.05,
+            mediaQueryExclusiveStep = 0.05,
             remBase = REM_BASE,
             emBase = EM_BASE,
         } = config
 
         this._config = {
-            breakpoints,
+            widthBreakpoints,
             heightBreakpoints,
             dimension: dimension as BreakpointDimension,
             element: element as HTMLElement | null,
-            defaultMatches: defaultMatches as Record<string, boolean>,
+            defaultWidthMatches: defaultWidthMatches as Record<string, boolean>,
             defaultHeightMatches: defaultHeightMatches as Record<string, boolean>,
-            unit: unit as import('./breakpoints.js').BreakpointUnit,
-            step,
+            mediaQueryExclusiveStep,
             remBase,
             emBase,
         }
@@ -386,30 +348,27 @@ export class BreakpointObserver {
         const initial = this._computeInitialState()
         this._stateSubject = new BehaviorSubject<BreakpointState>(initial)
 
-        // BehaviorSubject itself is multicast + replay(1); no extra shareReplay needed for state$
-        // Keep asObservable() for encapsulation; active$ still uses shareReplay for derived state
         this.state$ = this._stateSubject.asObservable() as Observable<BreakpointState>
 
-        this.active$ = this.state$.pipe(
-            map((s) => s.active),
-            distinctUntilChanged(shallowEqual),
+        this.activeWidthKeys$ = this.state$.pipe(
+            map((s) => s.activeWidthKeys),
+            distinctUntilChanged(isShallowEqualArray),
             shareReplay({ bufferSize: 1, refCount: true }),
         )
 
-        this.activeHeight$ = this.state$.pipe(
-            map((s) => s.activeHeight),
-            distinctUntilChanged(shallowEqual),
+        this.activeHeightKeys$ = this.state$.pipe(
+            map((s) => s.activeHeightKeys),
+            distinctUntilChanged(isShallowEqualArray),
             shareReplay({ bufferSize: 1, refCount: true }),
         )
 
-        // Start listening only in non-SSR
         if (!isServer()) {
             this._initStrategy()
         }
     }
 
     private _computeInitialState(): BreakpointState {
-        const { breakpoints, heightBreakpoints, dimension, element, defaultMatches, defaultHeightMatches, remBase, emBase } = this._config
+        const { widthBreakpoints, heightBreakpoints, dimension, element, defaultWidthMatches, defaultHeightMatches, remBase, emBase } = this._config
         const isServer_ = isServer()
 
         let width = 0
@@ -421,7 +380,6 @@ export class BreakpointObserver {
                     const rect = element.getBoundingClientRect()
                     width = rect.width
                     height = rect.height
-                    // jsdom may report width 0, fallback to offsetWidth
                     if (width === 0 && (element as HTMLElement & { offsetWidth?: number }).offsetWidth) {
                         width = (element as HTMLElement & { offsetWidth?: number }).offsetWidth ?? 0
                     }
@@ -433,14 +391,12 @@ export class BreakpointObserver {
                     height = 0
                 }
             } else {
-                // viewport
                 const w = getWindow()
                 width = w ? w.innerWidth : 0
                 height = w ? w.innerHeight : 0
             }
         }
 
-        // SSR + defaultMatches priority
         let wTable: Record<string, boolean> = {}
         let wActive: string[] = []
         let hTable: Record<string, boolean> = {}
@@ -448,14 +404,12 @@ export class BreakpointObserver {
 
         if (isServer_) {
             if (dimension === 'width' || dimension === 'both') {
-                if (defaultMatches) {
-                    wTable = { ...defaultMatches }
-                    // Fill missing keys not in defaultMatches with false to keep table complete
-                    for (const k of Object.keys(breakpoints)) if (!(k in wTable)) wTable[k] = false
+                if (defaultWidthMatches) {
+                    wTable = { ...defaultWidthMatches }
+                    for (const k of Object.keys(widthBreakpoints)) if (!(k in wTable)) wTable[k] = false
                     wActive = Object.entries(wTable).filter(([, v]) => v).map(([k]) => k)
                 } else {
-                    // V7: empty hit instead of guessing width 0
-                    wTable = Object.fromEntries(Object.keys(breakpoints).map(k => [k, false]))
+                    wTable = Object.fromEntries(Object.keys(widthBreakpoints).map(k => [k, false]))
                     wActive = []
                 }
             } else {
@@ -476,9 +430,8 @@ export class BreakpointObserver {
                 hActive = []
             }
         } else {
-            // Browser: unified numeric evaluation
             if (dimension === 'width' || dimension === 'both') {
-                const evaled = evaluateAll(width, breakpoints, remBase, emBase)
+                const evaled = evaluateAll(width, widthBreakpoints, remBase, emBase)
                 wTable = evaled.table
                 wActive = evaled.active
             }
@@ -489,53 +442,58 @@ export class BreakpointObserver {
             }
         }
 
-        // In single-dimension mode, clear mutually exclusive state (already handled above)
         if (dimension === 'width') {
             hTable = {}
             hActive = []
         } else if (dimension === 'height') {
             wTable = {}
             wActive = []
-            // In height mode, width keeps measured value but active is cleared; keep separation (don't merge height into width)
-            // TASK: 'height' means height only; for consistency, height value stays in height field
         }
 
         const matches = wActive.length > 0 || hActive.length > 0
+        const wActiveFrozen = Object.freeze([...wActive]) as string[]
+        const hActiveFrozen = Object.freeze([...hActive]) as string[]
+        const wTableFrozen = Object.freeze({ ...wTable })
+        const hTableFrozen = Object.freeze({ ...hTable })
+
         return {
             width,
             height,
-            active: Object.freeze([...wActive]) as string[],
-            activeHeight: Object.freeze([...hActive]) as string[],
-            breakpoints: Object.freeze({ ...wTable }),
-            heightBreakpoints: Object.freeze({ ...hTable }),
+            activeWidthKeys: wActiveFrozen,
+            activeHeightKeys: hActiveFrozen,
+            widthMatches: wTableFrozen,
+            heightMatches: hTableFrozen,
             matches,
-            current: wActive[0] ?? null,
-            currentHeight: hActive[0] ?? null,
+            primaryWidth: wActive[0] ?? null,
+            primaryHeight: hActive[0] ?? null,
         }
     }
 
     private _recompute(isFromMql = false): BreakpointState {
-        const { breakpoints, heightBreakpoints, dimension, remBase, emBase } = this._config
-        // Re-evaluate with current actual size
+        const { widthBreakpoints, heightBreakpoints, dimension, remBase, emBase } = this._config
         let width = this._stateSubject.getValue().width
         let height = this._stateSubject.getValue().height
 
         if (this._element) {
-            // Element mode: read actual element size, prefer cached observedEl
-            const el = this._observedEl ?? this._element
-            if (el) {
-                try {
-                    const rect = el.getBoundingClientRect()
-                    width = rect.width
-                    height = rect.height
-                    if (width === 0 && (el as HTMLElement & { offsetWidth?: number }).offsetWidth) {
-                        width = (el as HTMLElement & { offsetWidth?: number }).offsetWidth ?? width
+            if (this._lastContentRect) {
+                width = this._lastContentRect.width
+                height = this._lastContentRect.height
+            } else {
+                const el = this._observedEl ?? this._element
+                if (el) {
+                    try {
+                        const rect = el.getBoundingClientRect()
+                        width = rect.width
+                        height = rect.height
+                        if (width === 0 && (el as HTMLElement & { offsetWidth?: number }).offsetWidth) {
+                            width = (el as HTMLElement & { offsetWidth?: number }).offsetWidth ?? width
+                        }
+                        if (height === 0 && (el as HTMLElement & { offsetHeight?: number }).offsetHeight) {
+                            height = (el as HTMLElement & { offsetHeight?: number }).offsetHeight ?? height
+                        }
+                    } catch {
+                        // ignore
                     }
-                    if (height === 0 && (el as HTMLElement & { offsetHeight?: number }).offsetHeight) {
-                        height = (el as HTMLElement & { offsetHeight?: number }).offsetHeight ?? height
-                    }
-                } catch {
-                    // ignore
                 }
             }
         } else {
@@ -544,8 +502,6 @@ export class BreakpointObserver {
             height = w ? w.innerHeight : height
         }
 
-        // If triggered by mql and all definitions are mediaQuery-expressible, table could be built directly from mql.matches to avoid numeric errors
-        // For simplicity, still use numeric evaluation to stay consistent with step
         void isFromMql
 
         let wActive: string[] = []
@@ -554,7 +510,7 @@ export class BreakpointObserver {
         let hTable: Record<string, boolean> = {}
 
         if (dimension === 'width' || dimension === 'both') {
-            const evaled = evaluateAll(width, breakpoints, remBase, emBase)
+            const evaled = evaluateAll(width, widthBreakpoints, remBase, emBase)
             wActive = evaled.active
             wTable = evaled.table
         }
@@ -572,16 +528,21 @@ export class BreakpointObserver {
         }
 
         const matches = wActive.length > 0 || hActive.length > 0
+        const wActiveFrozen = Object.freeze([...wActive]) as string[]
+        const hActiveFrozen = Object.freeze([...hActive]) as string[]
+        const wTableFrozen = Object.freeze({ ...wTable })
+        const hTableFrozen = Object.freeze({ ...hTable })
+
         return {
             width,
             height,
-            active: Object.freeze([...wActive]) as string[],
-            activeHeight: Object.freeze([...hActive]) as string[],
-            breakpoints: Object.freeze({ ...wTable }),
-            heightBreakpoints: Object.freeze({ ...hTable }),
+            activeWidthKeys: wActiveFrozen,
+            activeHeightKeys: hActiveFrozen,
+            widthMatches: wTableFrozen,
+            heightMatches: hTableFrozen,
             matches,
-            current: wActive[0] ?? null,
-            currentHeight: hActive[0] ?? null,
+            primaryWidth: wActive[0] ?? null,
+            primaryHeight: hActive[0] ?? null,
         }
     }
 
@@ -601,7 +562,6 @@ export class BreakpointObserver {
     }
 
     private _scheduleEmitImmediate() {
-        // For synchronous recompute on first frame after observeElement switch, bypass rAF
         if (this._disposed) return
         if (this._rafId !== null) {
             getCancelRaf()(this._rafId)
@@ -638,49 +598,38 @@ export class BreakpointObserver {
     private _initViewportStrategy() {
         this._teardownViewportStrategy()
         if (isServer()) return
-        // matchMedia missing → fallback to resize numeric (do NOT early-return)
-        const { breakpoints, heightBreakpoints, dimension, step } = this._config
+        const { widthBreakpoints, heightBreakpoints, dimension, mediaQueryExclusiveStep } = this._config
 
-        // Determine whether all can be converted to mediaQuery
-        const maps: Array<{ map: BreakpointMap; dim: 'width' | 'height' }> = []
-        if (dimension === 'width' || dimension === 'both') maps.push({ map: breakpoints, dim: 'width' })
+        const maps: Array<{ map: WidthBreakpointMap | HeightBreakpointMap; dim: 'width' | 'height' }> = []
+        if (dimension === 'width' || dimension === 'both') maps.push({ map: widthBreakpoints, dim: 'width' })
         if (dimension === 'height' || dimension === 'both') maps.push({ map: heightBreakpoints, dim: 'height' })
 
-        let canUseMql = true
-        const queries: Array<{ key: string; dim: 'width' | 'height'; query: string }> = []
+        const hasMatchMedia = canUseMatchMedia()
+        let hasMql = false
+        let hasFallback = false
 
         for (const { map, dim } of maps) {
             for (const [key, def] of Object.entries(map)) {
-                const q = definitionToMediaQuery(def, dim, step)
-                if (q === null) {
-                    canUseMql = false
-                    break
+                const q = definitionToMediaQuery(def, dim, mediaQueryExclusiveStep)
+                const cacheKey = `${dim}:${key}`
+                if (q !== null && hasMatchMedia) {
+                    const mql = getWindow()!.matchMedia(q)
+                    const handler = () => this._scheduleEmit()
+                    if (typeof mql.addEventListener === 'function') {
+                        mql.addEventListener('change', handler)
+                    } else {
+                        // @ts-ignore legacy
+                        mql.addListener(handler)
+                    }
+                    this._mqlMap.set(cacheKey, { mql, handler, query: q })
+                    hasMql = true
+                } else {
+                    hasFallback = true
                 }
-                queries.push({ key: `${dim}:${key}`, dim, query: q })
             }
-            if (!canUseMql) break
         }
 
-        if (canUseMql && queries.length > 0 && canUseMatchMedia()) {
-            // Use mql + keep resize as safety for step gap (V3)
-            for (const { key, query } of queries) {
-                const mql = getWindow()!.matchMedia(query)
-                const handler = () => this._scheduleEmit()
-                // Compat: addListener
-                if (typeof mql.addEventListener === 'function') {
-                    mql.addEventListener('change', handler)
-                } else {
-                    // @ts-ignore legacy
-                    mql.addListener(handler)
-                }
-                this._mqlMap.set(key, { mql, handler, query })
-            }
-            // Mixed strategy: also listen resize to handle sub-pixel step gaps
-            const handler = () => this._scheduleEmit()
-            this._viewportResizeHandler = handler
-            getWindow()!.addEventListener('resize', handler)
-        } else {
-            // Fallback: window resize + rAF numeric evaluation
+        if (hasMql || hasFallback) {
             const handler = () => this._scheduleEmit()
             this._viewportResizeHandler = handler
             getWindow()!.addEventListener('resize', handler)
@@ -717,22 +666,23 @@ export class BreakpointObserver {
         if (!el) return
         let RO: typeof ResizeObserver | undefined
         if (canUseResizeObserver()) {
-            RO = (globalThis as unknown as { ResizeObserver?: typeof ResizeObserver }).ResizeObserver ?? (getWindow() as unknown as { ResizeObserver?: typeof ResizeObserver })?.ResizeObserver
+            RO = (getWindow() as unknown as { ResizeObserver?: typeof ResizeObserver })?.ResizeObserver
         }
         if (!RO) {
-            // No ResizeObserver, fallback to resize
             const handler = () => this._scheduleEmit()
             this._elementResizeHandler = handler
             getWindow()?.addEventListener('resize', handler)
             return
         }
-        // Singleton per element caching semantics: simplified to one RO per observer instance
         const ro = new RO((entries) => {
-            // Read contentRect
-            void entries
-            // Coalesce to rAF
+            const entry = entries[0] as unknown as { contentRect?: DOMRectReadOnly } | undefined
+            if (entry && entry.contentRect) {
+                const cr = entry.contentRect
+                this._lastContentRect = { width: cr.width, height: cr.height }
+            } else {
+                this._lastContentRect = null
+            }
             this._scheduleEmit()
-            // For precise values could read entries[0].contentRect, but _recompute re-reads getBoundingClientRect which is sufficient
         })
         try {
             ro.observe(el)
@@ -754,6 +704,7 @@ export class BreakpointObserver {
             this._ro = null
             this._observedEl = null
         }
+        this._lastContentRect = null
         if (this._elementResizeHandler) {
             try {
                 getWindow()?.removeEventListener('resize', this._elementResizeHandler)
@@ -770,174 +721,140 @@ export class BreakpointObserver {
         return this._stateSubject.getValue()
     }
 
-    /** @deprecated query param is legacy — returns snapshot (equivalent to BehaviorSubject.getValue()) */
-    getState(_query?: BreakpointDefinition): BreakpointState {
+    getState(): BreakpointState {
         return this.snapshot
     }
 
-    get observedElement(): HTMLElement | null {
-        // Logical observed element — reflects config, not just RO binding
-        // Keep _element as source of truth; _observedEl may be null on RO fallback but element is still observed
+    get attachedElement(): HTMLElement | null {
         return this._element
     }
 
-    get current(): string | null {
-        return this.snapshot.current
+    get primaryWidth(): string | null {
+        return this.snapshot.primaryWidth
     }
 
-    get currentHeight(): string | null {
-        return this.snapshot.currentHeight
+    get primaryHeight(): string | null {
+        return this.snapshot.primaryHeight
     }
 
-    private _isMatchedOnState(state: BreakpointState, query: string | string[] | BreakpointDefinition): boolean {
-        const { dimension } = this._config
+    // --- key presence (string is always a breakpoint key) ---
+
+    hasWidth(key: string): boolean {
+        return !!this.snapshot.widthMatches[key]
+    }
+
+    hasHeight(key: string): boolean {
+        return !!this.snapshot.heightMatches[key]
+    }
+
+    has(key: string, dimension: BreakpointDimension = 'width'): boolean {
+        if (dimension === 'both') return !!(this.snapshot.widthMatches[key] || this.snapshot.heightMatches[key])
+        if (dimension === 'width') return !!this.snapshot.widthMatches[key]
+        return !!this.snapshot.heightMatches[key]
+    }
+
+    // --- condition matching (BreakpointDefinition, never key) ---
+
+    matchesWidth(def: BreakpointDefinition): boolean {
         const remBase = this._config.remBase ?? REM_BASE
         const emBase = this._config.emBase ?? EM_BASE
-        // helper to resolve breakpoint key lookup before condition parsing
-        const isKey = (k: string) => k in state.breakpoints || k in state.heightBreakpoints
-        const keyMatched = (k: string): boolean | null => {
-            const inW = k in state.breakpoints
-            const inH = k in state.heightBreakpoints
-            if (!inW && !inH) return null
-            if (dimension === 'both') {
-                // OR across dimensions when both active (compact exists in both tables)
-                return !!(state.breakpoints[k] || state.heightBreakpoints[k])
-            }
-            if (inW && inH) {
-                // single dimension: respect dimension
-                return dimension === 'height' ? !!state.heightBreakpoints[k] : !!state.breakpoints[k]
-            }
-            if (inW) return !!state.breakpoints[k]
-            return !!state.heightBreakpoints[k]
-        }
-        if (typeof query === 'string') {
-            const km = keyMatched(query)
-            if (km !== null) return km
-            try {
-                if (dimension === 'both') {
-                    // For both, match if either dimension matches
-                    return matchesCondition(state.width, query, remBase, emBase) || matchesCondition(state.height, query, remBase, emBase)
-                }
-                const value = dimension === 'height' ? state.height : state.width
-                return matchesCondition(value, query, remBase, emBase)
-            } catch {
-                try {
-                    if (dimension === 'both') {
-                        return matchesDefinition(state.width, query as BreakpointDefinition, remBase, emBase) || matchesDefinition(state.height, query as BreakpointDefinition, remBase, emBase)
-                    }
-                    const v = dimension === 'height' ? state.height : state.width
-                    return matchesDefinition(v, query as BreakpointDefinition, remBase, emBase)
-                } catch {
-                    return false
-                }
-            }
-        }
-        if (Array.isArray(query)) {
-            try {
-                if (dimension === 'both') {
-                    const wVal = state.width
-                    const hVal = state.height
-                    const wMatch = (query as BreakpointDefinition[]).every((def) => {
-                        if (typeof def === 'string' && isKey(def)) {
-                            if (def in state.breakpoints) return !!state.breakpoints[def]
-                            return false
-                        }
-                        if (typeof def === 'string') return matchesCondition(wVal, def, remBase, emBase)
-                        return matchesDefinition(wVal, def as BreakpointDefinition, remBase, emBase)
-                    })
-                    const hMatch = (query as BreakpointDefinition[]).every((def) => {
-                        if (typeof def === 'string' && isKey(def)) {
-                            if (def in state.heightBreakpoints) return !!state.heightBreakpoints[def]
-                            return false
-                        }
-                        if (typeof def === 'string') return matchesCondition(hVal, def, remBase, emBase)
-                        return matchesDefinition(hVal, def as BreakpointDefinition, remBase, emBase)
-                    })
-                    if (wMatch || hMatch) return true
-                    // Pure-key fallback: every key must be matched in either dimension
-                    const allKeys = (query as unknown as string[]).every((k) => typeof k === 'string' && isKey(k))
-                    if (allKeys) {
-                        return (query as unknown as string[]).every((k) => keyMatched(k) === true)
-                    }
-                    return false
-                }
-                const value = dimension === 'height' ? state.height : state.width
-                return (query as BreakpointDefinition[]).every((def) => {
-                    if (typeof def === 'string' && isKey(def)) {
-                        const km = keyMatched(def as string)
-                        return km === true
-                    }
-                    if (typeof def === 'string') return matchesCondition(value, def, remBase, emBase)
-                    return matchesDefinition(value, def as BreakpointDefinition, remBase, emBase)
-                })
-            } catch {
-                return false
-            }
-        }
-        try {
-            if (dimension === 'both') {
-                return matchesDefinition(state.width, query as BreakpointDefinition, remBase, emBase) || matchesDefinition(state.height, query as BreakpointDefinition, remBase, emBase)
-            }
-            const value = dimension === 'height' ? state.height : state.width
-            return matchesDefinition(value, query as BreakpointDefinition, remBase, emBase)
-        } catch {
-            return false
-        }
+        return matchesDefinition(this.snapshot.width, def, remBase, emBase)
     }
 
-    isMatched(query: string | string[] | BreakpointDefinition): boolean {
-        return this._isMatchedOnState(this.snapshot, query)
+    matchesHeight(def: BreakpointDefinition): boolean {
+        const remBase = this._config.remBase ?? REM_BASE
+        const emBase = this._config.emBase ?? EM_BASE
+        return matchesDefinition(this.snapshot.height, def, remBase, emBase)
     }
 
-    /**
-     * Subscribe to changes for a given query; returns unbind function (internally a Subscription)
-     * Reversal semantics: emits when matched boolean flips (false<->true), distinctUntilChanged
-     * Callback receives current BreakpointState snapshot after reversal, so caller can read current value
-     */
-    observe(
-        query: BreakpointDefinition | BreakpointDefinition[],
-        cb?: (state: BreakpointState) => void,
-    ): () => void {
-        if (!cb) {
-            // No callback, return no-op unbind
-            return () => { }
-        }
+    matches(def: BreakpointDefinition, dimension: BreakpointDimension = 'width'): boolean {
+        const remBase = this._config.remBase ?? REM_BASE
+        const emBase = this._config.emBase ?? EM_BASE
+        if (dimension === 'both') return matchesDefinition(this.snapshot.width, def, remBase, emBase) || matchesDefinition(this.snapshot.height, def, remBase, emBase)
+        const v = dimension === 'height' ? this.snapshot.height : this.snapshot.width
+        return matchesDefinition(v, def, remBase, emBase)
+    }
 
-        // Reversal: distinct on matched boolean, emit state when it flips
+    // --- subscribe (callback, cb required) ---
+
+    subscribeWidth(def: BreakpointDefinition, cb: (state: BreakpointState) => void): () => void {
         const sub = this.state$.pipe(
-            distinctUntilChanged((prev, curr) => this._isMatchedOnState(prev, query as any) === this._isMatchedOnState(curr, query as any)),
+            distinctUntilChanged((prev, curr) => this.matchesWidthOnState(prev, def) === this.matchesWidthOnState(curr, def)),
         ).subscribe(cb)
         return () => sub.unsubscribe()
     }
 
-    /**
-     * More RxJS-idiomatic: returns Observable, reversal semantics
-     */
-    observe$(query: BreakpointDefinition): Observable<BreakpointState> {
-        if (query === undefined || query === null) return this.state$
-        // Reversal: emit only when matched boolean flips
+    subscribeHeight(def: BreakpointDefinition, cb: (state: BreakpointState) => void): () => void {
+        const sub = this.state$.pipe(
+            distinctUntilChanged((prev, curr) => this.matchesHeightOnState(prev, def) === this.matchesHeightOnState(curr, def)),
+        ).subscribe(cb)
+        return () => sub.unsubscribe()
+    }
+
+    subscribe(def: BreakpointDefinition, dimension: BreakpointDimension, cb: (state: BreakpointState) => void): () => void {
+        const sub = this.state$.pipe(
+            distinctUntilChanged((prev, curr) => this.matchesOnState(prev, def, dimension) === this.matchesOnState(curr, def, dimension)),
+        ).subscribe(cb)
+        return () => sub.unsubscribe()
+    }
+
+    // --- watch (Observable<boolean>) ---
+
+    watchWidth(def: BreakpointDefinition): Observable<boolean> {
         return this.state$.pipe(
-            distinctUntilChanged((prev, curr) => this._isMatchedOnState(prev, query as BreakpointDefinition) === this._isMatchedOnState(curr, query as BreakpointDefinition)),
+            map((s) => this.matchesWidthOnState(s, def)),
+            distinctUntilChanged(),
         )
     }
 
-    observeElement(el: HTMLElement | null): void {
+    watchHeight(def: BreakpointDefinition): Observable<boolean> {
+        return this.state$.pipe(
+            map((s) => this.matchesHeightOnState(s, def)),
+            distinctUntilChanged(),
+        )
+    }
+
+    watch(def: BreakpointDefinition, dimension: BreakpointDimension = 'width'): Observable<boolean> {
+        return this.state$.pipe(
+            map((s) => this.matchesOnState(s, def, dimension)),
+            distinctUntilChanged(),
+        )
+    }
+
+    private matchesWidthOnState(state: BreakpointState, def: BreakpointDefinition): boolean {
+        const remBase = this._config.remBase ?? REM_BASE
+        const emBase = this._config.emBase ?? EM_BASE
+        return matchesDefinition(state.width, def, remBase, emBase)
+    }
+
+    private matchesHeightOnState(state: BreakpointState, def: BreakpointDefinition): boolean {
+        const remBase = this._config.remBase ?? REM_BASE
+        const emBase = this._config.emBase ?? EM_BASE
+        return matchesDefinition(state.height, def, remBase, emBase)
+    }
+
+    private matchesOnState(state: BreakpointState, def: BreakpointDefinition, dimension: BreakpointDimension): boolean {
+        const remBase = this._config.remBase ?? REM_BASE
+        const emBase = this._config.emBase ?? EM_BASE
+        if (dimension === 'both') return matchesDefinition(state.width, def, remBase, emBase) || matchesDefinition(state.height, def, remBase, emBase)
+        const v = dimension === 'height' ? state.height : state.width
+        return matchesDefinition(v, def, remBase, emBase)
+    }
+
+    attachElement(el: HTMLElement | null): void {
         if (this._disposed) return
         if (el === this._element) return
-        // Clean up old strategy
         this._teardownStrategy()
         this._element = el
         this._config.element = el
-        // Immediately recompute first frame with new element size after switch
         this._scheduleEmitImmediate()
-        // Re-initialize strategy
         if (!isServer()) {
             this._initStrategy()
         }
     }
 
-    unobserveElement(): void {
-        this.observeElement(null)
+    detachElement(): void {
+        this.attachElement(null)
     }
 
     dispose(): void {
@@ -948,7 +865,6 @@ export class BreakpointObserver {
             getCancelRaf()(this._rafId)
             this._rafId = null
         }
-        // Clear DOM refs to avoid leaks; observedElement should be null after dispose
         this._element = null
         this._config.element = null
         try {
@@ -957,23 +873,12 @@ export class BreakpointObserver {
     }
 }
 
-export { BreakpointObserver as BreakingPointObserver }
-
-// Default singleton (viewport) — unified with getDefaultBreakpointObserver (V4)
+// Singleton — viewport only
 let _default: BreakpointObserver | null = null
-export function getDefaultBreakpointObserver(): BreakpointObserver {
+export function getDefaultViewportObserver(): BreakpointObserver {
     const isDisposed = (_default as unknown as { _disposed?: boolean })?._disposed
     if (!_default || isDisposed) {
         _default = new BreakpointObserver()
-        // Keep live export in sync, but avoid TDZ during module init
-        try {
-            if (typeof defaultBreakpointObserver !== 'undefined' && defaultBreakpointObserver !== _default) {
-                defaultBreakpointObserver = _default
-            }
-        } catch {
-            // TDZ during first initialization — ignore, initializer will assign
-        }
     }
     return _default
 }
-export let defaultBreakpointObserver: BreakpointObserver = getDefaultBreakpointObserver()

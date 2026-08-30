@@ -1,6 +1,6 @@
 /**
  * breakpoint — barrel
- * Re-exports public API per TASK spec, including BreakingPointObserver alias for backward compatibility
+ * Re-exports public API (zero framework, 100% RxJS)
  */
 
 export * from './breakpoint-observer.js'

@@ -21,15 +21,11 @@ export function canUseMatchMedia(): boolean {
 }
 
 export function canUseResizeObserver(): boolean {
-    if (typeof globalThis !== 'undefined' && typeof (globalThis as unknown as { ResizeObserver?: unknown }).ResizeObserver === 'function') {
-        return true
-    }
     return isBrowser() && typeof (window as unknown as { ResizeObserver?: unknown }).ResizeObserver === 'function'
 }
 
 export function canUseRequestAnimationFrame(): boolean {
-    if (isBrowser() && typeof window.requestAnimationFrame === 'function') return true
-    return typeof globalThis !== 'undefined' && typeof (globalThis as unknown as { requestAnimationFrame?: unknown }).requestAnimationFrame === 'function'
+    return isBrowser() && typeof window.requestAnimationFrame === 'function'
 }
 
 export function getWindow(): (Window & typeof globalThis) | undefined {
