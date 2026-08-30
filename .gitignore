@@ -22,3 +22,16 @@ pnpm-debug.log*
 
 # jetbrains setting folder
 .idea/
+
+# AI
+.agents
+.gemini
+.codex
+.claude
+.superpower
+.superpowers
+docs/.superpower
+docs/.superpowers
+.jules
+*.md
+!README.md
