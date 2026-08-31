@@ -1,11 +1,10 @@
 {
     "author": "Kai Orion & Sandlada",
-    "dependencies": {
-        "rxjs": "^7.8.1"
-    },
+    "dependencies": {},
     "description": "Breakpoint Observer — Responsive viewport/element breakpoint observer (MD3, RxJS, zero-framework)",
     "devDependencies": {
-        "jsdom": "^27.2.0",
+        "jsdom": "^30.0.1",
+        "rxjs": "^7.8.2",
         "tsdown": "^0.22.14",
         "typescript": "^7.0.2",
         "vitest": "^4.1.11"
@@ -14,6 +13,14 @@
         ".": {
             "import": "./dist/index.js",
             "types": "./dist/index.d.ts"
+        },
+        "./breakpoint": {
+            "import": "./dist/breakpoint/index.js",
+            "types": "./dist/breakpoint/index.d.ts"
+        },
+        "./breakpoint/*": {
+            "import": "./dist/breakpoint/*.js",
+            "types": "./dist/breakpoint/*.d.ts"
         }
     },
     "files": [
@@ -33,6 +40,9 @@
     "license": "MIT",
     "main": "./dist/index.js",
     "name": "@sandlada/breakpoint",
+    "peerDependencies": {
+        "rxjs": ">=7.0.0"
+    },
     "publishConfig": {
         "access": "public"
     },
@@ -47,6 +57,7 @@
         "test:watch": "vitest",
         "typecheck": "tsc --noEmit"
     },
+    "sideEffects": false,
     "type": "module",
     "types": "./dist/index.d.ts",
     "version": "0.0.1-20260824.a"
