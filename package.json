@@ -62,5 +62,5 @@
     "sideEffects": false,
     "type": "module",
     "types": "./dist/index.d.ts",
-    "version": "0.0.1-20260824.a"
+    "version": "0.0.1-20260831.a"
 }
