@@ -1,8 +1,8 @@
 /**
- * @sandlada/breakpoint — Main entry
- * Zero framework, 100% RxJS
+ * Main package entry for @sandlada/breakpoint.
+ * Pure functional, zero-framework, 100% RxJS reactive breakpoint library.
  */
 
-export const version = '1.0.0'
-
 export * from './breakpoint/index.js'
+
+

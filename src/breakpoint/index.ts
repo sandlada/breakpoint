@@ -1,10 +1,10 @@
 /**
- * breakpoint — barrel
- * Re-exports public API (zero framework, 100% RxJS)
+ * Breakpoint module barrel re-exporting public functional APIs, types, and utilities.
  */
 
 export * from './breakpoint-observer.js'
 export * from './breakpoints.js'
 export * from './rx.js'
 export * from './is-server.js'
+
 

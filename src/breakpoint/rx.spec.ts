@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { BreakpointObserver } from './breakpoint-observer.js'
-import { Subject, isShallowEqualArray } from './rx.js'
+import { createBreakpointObserver } from './breakpoint-observer.js'
+import { Subject, isShallowEqualArray, isShallowEqualRecord } from './rx.js'
 
 describe('rx utilities', () => {
     it('isShallowEqualArray compares generic arrays correctly', () => {
@@ -26,40 +26,51 @@ describe('rx utilities', () => {
         expect(isShallowEqualArray([{ id: 1 }], [{ id: 1 }])).toBe(false)
     })
 
-    it('BreakpointObserver active streams via state$', () => {
-        const obs = new BreakpointObserver()
-        expect(obs.state$).toBeDefined()
-        expect(obs.activeWidthKeys$).toBeDefined()
-        expect(obs.activeHeightKeys$).toBeDefined()
+    it('isShallowEqualRecord compares boolean records correctly', () => {
+        expect(isShallowEqualRecord({}, {})).toBe(true)
+        expect(isShallowEqualRecord({ a: true, b: false }, { a: true, b: false })).toBe(true)
+        expect(isShallowEqualRecord({ a: true, b: false }, { a: true, b: true })).toBe(false)
+        expect(isShallowEqualRecord({ a: true }, { a: true, b: false })).toBe(false)
+        expect(isShallowEqualRecord({ a: true, b: false }, { a: true })).toBe(false)
+        const record = { a: true }
+        expect(isShallowEqualRecord(record, record)).toBe(true)
+    })
+
+    it('createBreakpointObserver active streams via state$', () => {
+        const observer = createBreakpointObserver()
+        expect(observer.state$).toBeDefined()
+        expect(observer.activeWidthBreakpoints$).toBeDefined()
+        expect(observer.activeHeightBreakpoints$).toBeDefined()
         let emitted = false
-        const sub = obs.state$.subscribe((s) => {
-            expect(s.width).toBeDefined()
+        const sub = observer.state$.subscribe((state) => {
+            expect(state.width).toBeDefined()
             emitted = true
         })
         expect(emitted).toBe(true)
         sub.unsubscribe()
-        obs.dispose()
+        observer.dispose()
     })
 
-    it('activeWidthKeys$ shareReplay', () => {
-        const obs = new BreakpointObserver({ dimension: 'both' })
-        const width$ = obs.activeWidthKeys$
-        const valsA: string[][] = []
-        const valsB: string[][] = []
-        const subA = width$.subscribe(v => valsA.push(v))
-        const subB = width$.subscribe(v => valsB.push(v))
-        expect(valsA).toEqual(valsB)
+    it('activeWidthBreakpoints$ shareReplay', () => {
+        const observer = createBreakpointObserver({ dimension: 'both' })
+        const width$ = observer.activeWidthBreakpoints$
+        const valuesA: string[][] = []
+        const valuesB: string[][] = []
+        const subA = width$.subscribe((value) => valuesA.push(value))
+        const subB = width$.subscribe((value) => valuesB.push(value))
+        expect(valuesA).toEqual(valuesB)
         subA.unsubscribe()
         subB.unsubscribe()
-        obs.dispose()
+        observer.dispose()
     })
 
     it('Subject re-export functions as RxJS Subject', () => {
-        const s = new Subject<number>()
-        let val = 0
-        s.subscribe((v) => { val = v })
-        s.next(42)
-        expect(val).toBe(42)
-        s.complete()
+        const subject = new Subject<number>()
+        let value = 0
+        subject.subscribe((emittedValue) => { value = emittedValue })
+        subject.next(42)
+        expect(value).toBe(42)
+        subject.complete()
     })
 })
+
