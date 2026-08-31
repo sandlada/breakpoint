@@ -1,173 +1,282 @@
 # @sandlada/breakpoint
 
-Responsive viewport / element breakpoint observer — zero framework, 100% RxJS.
+Responsive viewport / element breakpoint observer — zero framework, pure functional, data-last, 100% RxJS.
 
-A production-grade, framework-agnostic breakpoint observer for viewport and arbitrary DOM elements. Built on `rxjs@^7.8.x` only (`BehaviorSubject` + `Observable` + pipeable operators). Supports custom breakpoints, overlapping ranges, precise operator control, AND/OR composition, SSR safety, and runtime element switching.
-
-> Correct spelling is `breakpoint`; `BreakingPointObserver` alias is exported for backward compatibility.
+A production-grade, framework-agnostic breakpoint evaluation and observation library for viewport and arbitrary DOM elements. Built with a pure functional, higher-order function, parameter-last architecture on `rxjs@^7.8.x`. Supports custom breakpoints, overlapping ranges, precise operator control, AND/OR composition, SSR safety, zero top-level side effects, and runtime element switching with fully symmetric width and height dimensions.
 
 ## Features
 
-- **Zero framework** — no `lit` / `vue` / `react` dependencies; `rxjs` is the only runtime dependency
-- **100% reactive** — `state$` (`shareReplay(1)`), `active$` / `activeHeight$` (`distinctUntilChanged` + `shareReplay`), synchronous `snapshot`
-- **Viewport & element** — observe `window` by default or any `HTMLElement` via `ResizeObserver` + `rAF` coalescing; switch at runtime with `observeElement()`
+- **Zero framework** — pure functional design; no class instances, `rxjs` is the only runtime dependency
+- **100% reactive** — `state$` (`shareReplay(1)`), `activeWidthBreakpoints$` / `activeHeightBreakpoints$` (`distinctUntilChanged` + `shareReplay`), synchronous `snapshot`
+- **Data-last & currying** — `matchesBreakpointDefinition(def)(widthPx)`, `evaluateBreakpointMap(map)(widthPx)`
+- **Viewport & element** — observe `window` by default or any `HTMLElement` via `ResizeObserver` + `rAF` coalescing; switch at runtime with `attachElement()`
 - **MD3 defaults** — width (`compact <600`, `medium 600–839`, `expanded 840–1199`, `large 1200–1599`, `extraLarge >=1600`) and height (`compact <480`, `medium 480–899`, `expanded >=900`) with aliases `xs/sm/md/lg/xl`
-- **String operators** — `>`, `>=`, `<`, `<=`, `=`, `==`, `!=` (e.g. `'> 840px'`, `'= 1200px'`, `'!= 960px'`), whitespace-tolerant, decimal support, `px`/`rem`
-- **AND / OR composition** — `string[]` defaults to AND, `{ and: [...] }` / `{ or: [...] }` explicit
-- **Overlapping ranges** — each breakpoint evaluated independently; multiple `active` values at once
-- **SSR safe** — `typeof window === 'undefined'` short-circuit; first frame via `defaultMatches`
-- **Tree-shakable**, `platform: 'neutral'`, ESM-only + d.ts
+- **String operators** — `>`, `>=`, `<`, `<=`, `=`, `==`, `!=` (e.g. `'> 840px'`, `'= 1200px'`, `'!= 960px'`), whitespace-tolerant, decimal support, `px`/`rem`/`em` and absolute/viewport units
+- **AND / OR composition** — `{ and: [...] }` / `{ or: [...] }` explicit composition
+- **Overlapping ranges** — each breakpoint evaluated independently; multiple active breakpoints simultaneously
+- **SSR safe** — strict `typeof window === 'undefined'` short-circuit; initial state configured via `defaultWidthMatches` / `defaultHeightMatches`
+- **Tree-shakable & zero top-level side-effects** (`"sideEffects": false`), ESM-only with unbundled module structure + `d.ts`
 
-## Installation
+## Install
 
 ```bash
+# npm
 npm install @sandlada/breakpoint rxjs
-# or
-pnpm add @sandlada/breakpoint rxjs
 ```
 
-## Quick Start
+## Usages
+
+### Quick Start
 
 ```ts
-import { BreakpointObserver } from '@sandlada/breakpoint'
+import { createBreakpointObserver } from '@sandlada/breakpoint'
 
-const obs = new BreakpointObserver()
-const sub = obs.state$.subscribe(s => console.log(s.active)) // ['medium']
-console.log(obs.snapshot.active) // sync snapshot
+const observer = createBreakpointObserver()
 
-// Derive streams with RxJS operators
-import { map, distinctUntilChanged } from 'rxjs'
-const isExpanded$ = obs.state$.pipe(
-  map(s => s.active.includes('expanded')),
-  distinctUntilChanged(),
-)
+// Subscribe to state stream
+const subscription = observer.state$.subscribe((state) => {
+    console.log(state.activeWidthBreakpoints) // e.g. ['medium', 'sm']
+    console.log(state.widthMatches)           // { compact: false, medium: true, ... }
+})
 
-// Cleanup (framework-agnostic)
-import { Subject, takeUntil } from 'rxjs'
-const destroy$ = new Subject<void>()
-obs.state$.pipe(takeUntil(destroy$)).subscribe(render)
-destroy$.next(); destroy$.complete(); obs.dispose()
+// Read synchronous snapshot
+console.log(observer.snapshot.activeWidthBreakpoints)
+
+// Clean up when done
+subscription.unsubscribe()
+observer.dispose()
 ```
 
-## Custom Breakpoints
+### Standalone Reactive Streams
 
 ```ts
-const obs = new BreakpointObserver({
-  breakpoints: {
-    a: ['> 840px', '< 1200px'],
-    b: ['> 600px', '< 960px'],
-    c: '= 1200px',
-    extreme: { or: ['< 840px', '> 1600px'] },
-    complex: { and: ['> 840px', '< 1200px', '!= 960px'] },
-  }
+import {
+    observeBreakpointState,
+    observeWidthBreakpoint,
+    observeActiveWidthBreakpoints,
+} from '@sandlada/breakpoint'
+
+// Observe a single condition stream (cold observable, auto-cleans on unsubscription)
+const isExpanded$ = observeWidthBreakpoint('>= 840px')
+const sub1 = isExpanded$.subscribe((isExpanded) => {
+    console.log('isExpanded:', isExpanded)
+})
+
+// Observe active breakpoint keys stream
+const activeKeys$ = observeActiveWidthBreakpoints()
+const sub2 = activeKeys$.subscribe((keys) => {
+    console.log('active keys:', keys)
+})
+
+// Unsubscribe to clean up underlying listeners
+sub1.unsubscribe()
+sub2.unsubscribe()
+```
+
+### Pure Functional Evaluation & Currying (Data-Last)
+
+All evaluation functions support direct invocation, curried (data-last) partial application, and argument reordering:
+
+```ts
+import {
+    matchesBreakpointCondition,
+    matchesBreakpointDefinition,
+    evaluateBreakpointMap,
+    DEFAULT_WIDTH_BREAKPOINTS,
+} from '@sandlada/breakpoint'
+
+// 1. Curried condition evaluation (data-last)
+const isLargeWidth = matchesBreakpointCondition('>= 1200px')
+console.log(isLargeWidth(1440)) // true
+console.log(isLargeWidth(800))  // false
+
+// 2. Direct condition evaluation
+console.log(matchesBreakpointCondition('>= 1200px', 1440)) // true
+console.log(matchesBreakpointCondition(1440, '>= 1200px')) // true
+
+// 3. Definition evaluation with AND/OR logic
+const isTablet = matchesBreakpointDefinition({ and: ['>= 600px', '< 1024px'] })
+console.log(isTablet(768)) // true
+
+// 4. Map evaluation
+const evaluateMd3 = evaluateBreakpointMap(DEFAULT_WIDTH_BREAKPOINTS)
+const result = evaluateMd3(1024)
+console.log(result.activeBreakpoints) // ['expanded', 'md']
+console.log(result.matchesTable)     // { compact: false, medium: false, expanded: true, ... }
+```
+
+### Custom Breakpoints & Logical Composition
+
+```ts
+import { createBreakpointObserver, Breakpoint } from '@sandlada/breakpoint'
+
+const observer = createBreakpointObserver({
+    widthBreakpoints: {
+        mobile: '< 600px',
+        tablet: Breakpoint.interval(600, 1024),
+        desktop: '>= 1024px',
+        customOr: { or: ['< 480px', '>= 1920px'] },
+        customAnd: { and: ['>= 768px', '<= 1440px'] },
+        customRange: { min: 600, max: 960, minInclusive: true, maxInclusive: false },
+    },
 })
 ```
 
-String syntax: `[operator] [value][unit]` — `'> 840px'`, `'>= 640px'`, `'< 1200px'`, `'<= 960px'`, `'= 1600px'` / `'== 1600px'`, `'!= 960px'`. Unit `px` is optional (defaults to `px`).
-
-Factory helpers:
+### Element Observation & Runtime Switching
 
 ```ts
-import { Breakpoint } from '@sandlada/breakpoint'
+import { createBreakpointObserver } from '@sandlada/breakpoint'
 
-Breakpoint.gt(840)          // '> 840px'
-Breakpoint.between(600, 840) // { and: ['>= 600px', '< 840px'] }  // left-closed, right-open
-Breakpoint.range(840, 1199)  // { and: ['>= 840px', '<= 1199px'] } // inclusive both ends
-```
+const containerElement = document.querySelector('#container') as HTMLElement
 
-## Element Observer + Runtime Switching
-
-```ts
-const panel = new BreakpointObserver({
-  element: document.querySelector('#panel'),
-  dimension: 'both', // 'width' | 'height' | 'both'
+const containerObserver = createBreakpointObserver({
+    element: containerElement,
+    dimension: 'both', // 'width' | 'height' | 'both'
 })
-panel.state$.subscribe(s => console.log(s.active, s.activeHeight))
-panel.active$.subscribe(a => console.log('width active:', a))
-panel.activeHeight$.subscribe(a => console.log('height active:', a))
 
-// Switch element at runtime — old element stops triggering, new element recomputes first frame immediately
-panel.observeElement(document.querySelector('#other'))
-panel.unobserveElement() // back to viewport
-```
-
-## API
-
-### `breakpoints.ts`
-
-```ts
-export const DEFAULT_BREAKPOINTS: BreakpointMap
-export const DEFAULT_HEIGHT_BREAKPOINTS: HeightBreakpointMap
-export const Breakpoint: { gt, gte, lt, lte, eq, ne, between, range }
-export type BreakpointMap, HeightBreakpointMap, BreakpointDefinition, BreakpointCondition, BreakpointConfig, BreakpointState
-```
-
-### `BreakpointObserver`
-
-```ts
-class BreakpointObserver {
-  static readonly defaultBreakpoints: BreakpointMap
-  static readonly defaultHeightBreakpoints: HeightBreakpointMap
-
-  readonly state$: Observable<BreakpointState>       // shareReplay(1)
-  readonly active$: Observable<string[]>              // width hits
-  readonly activeHeight$: Observable<string[]>        // height hits (dimension:'both')
-
-  get snapshot(): BreakpointState
-  getState(): BreakpointState
-  get observedElement(): HTMLElement | null
-  get current(): string | null
-  get currentHeight(): string | null
-
-  constructor(config?: BreakpointConfig)
-  // config: { breakpoints?, heightBreakpoints?, dimension?:'width'|'height'|'both',
-  //           element?: HTMLElement|null, defaultMatches?, defaultHeightMatches?,
-  //           unit?:'px'|'rem', step?:number }
-
-  isMatched(query: string | string[] | BreakpointDefinition): boolean
-  observe(query: BreakpointDefinition | BreakpointDefinition[], cb?: (s: BreakpointState)=>void): () => void
-  observe$(query: BreakpointDefinition): Observable<BreakpointState>
-  observeElement(el: HTMLElement | null): void
-  unobserveElement(): void
-  dispose(): void
-}
-export { BreakpointObserver as BreakingPointObserver }
-export const defaultBreakpointObserver: BreakpointObserver
-```
-
-`BreakpointState`:
-
-```ts
-interface BreakpointState {
-  width: number; height: number
-  active: string[]; activeHeight: string[]
-  breakpoints: Readonly<Record<string, boolean>>
-  heightBreakpoints: Readonly<Record<string, boolean>>
-  matches: boolean
-  current: string | null; currentHeight: string | null
-}
-```
-
-### `rx.ts`
-
-```ts
-export function shallowEqual(a: string[], b: string[]): boolean
-export function shallowEqualArray<T>(a: T[], b: T[]): boolean
-export function fromBreakpointObserver(obs: BreakpointObserver): Observable<BreakpointState>
-export function activeFrom(obs: BreakpointObserver): Observable<string[]>
-```
-
-## SSR
-
-```ts
-// Server: no window access, first frame falls back to defaultMatches
-const obs = new BreakpointObserver({
-  defaultMatches: { compact: true, medium: false },
+containerObserver.state$.subscribe((state) => {
+    console.log(state.width, state.height)
+    console.log(state.activeWidthBreakpoints, state.activeHeightBreakpoints)
 })
-console.log(obs.snapshot.active) // ['compact']
+
+// Switch observed element at runtime
+const otherElement = document.querySelector('#sidebar') as HTMLElement
+containerObserver.attachElement(otherElement)
+
+// Detach element to fall back to viewport observation
+containerObserver.detachElement()
+
+// Destroy observer and disconnect ResizeObserver
+containerObserver.dispose()
 ```
 
-`typeof window === 'undefined' || typeof window.matchMedia === 'undefined'` guards all `window` / `ResizeObserver` / `matchMedia` access.
+### Server-Side Rendering (SSR)
+
+The library safely evaluates on Node.js/SSR environments without window errors:
+
+```ts
+import { createBreakpointObserver, isServer } from '@sandlada/breakpoint'
+
+console.log(isServer()) // true on server
+
+const ssrObserver = createBreakpointObserver({
+    defaultWidthMatches: {
+        compact: true,
+        medium: false,
+        expanded: false,
+    },
+})
+
+// Synchronous snapshot and initial stream values use defaults
+console.log(ssrObserver.snapshot.activeWidthBreakpoints) // ['compact']
+```
+
+## API Reference
+
+### Observer & Stream Creators
+
+- `createBreakpointObserver(configuration?: BreakpointConfiguration): BreakpointObserverInstance`
+- `observeBreakpointState(configuration?: BreakpointConfiguration): Observable<BreakpointState>`
+- `observeBreakpoint(definition: BreakpointDefinition, dimension?: BreakpointDimension, configuration?: BreakpointConfiguration): Observable<boolean>`
+- `observeWidthBreakpoint(definition: BreakpointDefinition, configuration?: BreakpointConfiguration): Observable<boolean>`
+- `observeHeightBreakpoint(definition: BreakpointDefinition, configuration?: BreakpointConfiguration): Observable<boolean>`
+- `observeActiveBreakpoints(dimension?: BreakpointDimension, configuration?: BreakpointConfiguration): Observable<string[]>`
+- `observeActiveWidthBreakpoints(configuration?: BreakpointConfiguration): Observable<string[]>`
+- `observeActiveHeightBreakpoints(configuration?: BreakpointConfiguration): Observable<string[]>`
+- `getDefaultViewportObserver(): BreakpointObserverInstance`
+
+### Pure Evaluation & Transformation Functions
+
+- `parseBreakpointCondition(conditionString: BreakpointCondition): ParsedBreakpointCondition`
+- `matchesBreakpointCondition(condition: BreakpointCondition, options?: BreakpointEvaluationOptions): (value: number) => boolean`
+- `matchesBreakpointCondition(condition: BreakpointCondition, value: number, options?: BreakpointEvaluationOptions): boolean`
+- `matchesBreakpointCondition(value: number, condition: BreakpointCondition, options?: BreakpointEvaluationOptions): boolean`
+- `matchesBreakpointDefinition(definition: BreakpointDefinition, options?: BreakpointEvaluationOptions): (value: number) => boolean`
+- `matchesBreakpointDefinition(definition: BreakpointDefinition, value: number, options?: BreakpointEvaluationOptions): boolean`
+- `matchesBreakpointDefinition(value: number, definition: BreakpointDefinition, options?: BreakpointEvaluationOptions): boolean`
+- `evaluateBreakpointMap(map: BreakpointMap, options?: BreakpointEvaluationOptions): (value: number) => BreakpointEvaluationResult`
+- `evaluateBreakpointMap(map: BreakpointMap, value: number, options?: BreakpointEvaluationOptions): BreakpointEvaluationResult`
+- `evaluateBreakpointMap(value: number, map: BreakpointMap, options?: BreakpointEvaluationOptions): BreakpointEvaluationResult`
+- `computeBreakpointState(targetWidthPx: number, targetHeightPx: number, configuration?: BreakpointConfiguration): BreakpointState`
+- `convertConditionToMediaQuery(condition: BreakpointCondition, dimension: 'width' | 'height', mediaQueryExclusiveStep: number): string | null`
+- `convertDefinitionToMediaQuery(definition: BreakpointDefinition, dimension: 'width' | 'height', mediaQueryExclusiveStep: number): string | null`
+
+### Breakpoint Builders & Helpers
+
+- `Breakpoint.gt(value: number, unit?: BreakpointUnit): BreakpointCondition`
+- `Breakpoint.gte(value: number, unit?: BreakpointUnit): BreakpointCondition`
+- `Breakpoint.lt(value: number, unit?: BreakpointUnit): BreakpointCondition`
+- `Breakpoint.lte(value: number, unit?: BreakpointUnit): BreakpointCondition`
+- `Breakpoint.eq(value: number, unit?: BreakpointUnit): BreakpointCondition`
+- `Breakpoint.ne(value: number, unit?: BreakpointUnit): BreakpointCondition`
+- `Breakpoint.interval(min: number, max: number, options?: BreakpointIntervalOptions): BreakpointDefinition`
+- `Breakpoint.between(min: number, max: number, options?: BreakpointIntervalOptions): BreakpointDefinition`
+- `greaterThan(value: number, unit?: BreakpointUnit): BreakpointCondition`
+- `greaterThanOrEqual(value: number, unit?: BreakpointUnit): BreakpointCondition`
+- `lessThan(value: number, unit?: BreakpointUnit): BreakpointCondition`
+- `lessThanOrEqual(value: number, unit?: BreakpointUnit): BreakpointCondition`
+- `equals(value: number, unit?: BreakpointUnit): BreakpointCondition`
+- `notEquals(value: number, unit?: BreakpointUnit): BreakpointCondition`
+- `createBreakpointInterval(min: number, max: number, options?: BreakpointIntervalOptions): BreakpointDefinition`
+
+### Environment & SSR Utilities
+
+- `isServer(): boolean`
+- `isBrowser(): boolean`
+- `canUseDOM(): boolean`
+- `canUseMatchMedia(): boolean`
+- `canUseResizeObserver(): boolean`
+- `canUseRequestAnimationFrame(): boolean`
+- `getWindow(): (Window & typeof globalThis) | undefined`
+- `getDocument(): Document | undefined`
+
+### Reactive & Comparison Utilities
+
+- `Subject` (re-exported from `rxjs`)
+- `isShallowEqualArray<T>(firstArray: readonly T[], secondArray: readonly T[]): boolean`
+- `isShallowEqualRecord(firstRecord: Readonly<Record<string, boolean>>, secondRecord: Readonly<Record<string, boolean>>): boolean`
+
+### Constants
+
+- `DEFAULT_WIDTH_BREAKPOINTS: Readonly<WidthBreakpointMap>`
+- `DEFAULT_HEIGHT_BREAKPOINTS: Readonly<HeightBreakpointMap>`
+- `ABSOLUTE_PX: Readonly<Record<AbsoluteBreakpointUnit, number>>`
+- `REM_BASE: number` (16)
+- `EM_BASE: number` (16)
+
+### Types & Interfaces
+
+- `BreakpointObserverInstance`
+- `BreakpointState`
+- `BreakpointConfiguration`
+- `BreakpointDefinition`
+- `BreakpointCondition`
+- `BreakpointRange`
+- `BreakpointDimension` (`'width' | 'height' | 'both'`)
+- `BreakpointLogic` (`'and' | 'or'`)
+- `BreakpointUnit` / `ParsedBreakpointUnit`
+- `AbsoluteBreakpointUnit`
+- `WidthBreakpointMap` / `HeightBreakpointMap` / `BreakpointMap`
+- `BreakpointEvaluationOptions`
+- `BreakpointEvaluationResult`
+- `BreakpointIntervalOptions`
+- `ParsedBreakpointCondition`
+
+## Testing & Quality Assurance
+
+This repository employs a **Spec-First / Black-Box** testing methodology. Tests verify interface signatures, mathematical boundary constraints, and lifecycle contracts without coupling to internal implementations.
+
+Each test suite organizes specifications with structured nested `describe` blocks:
+- **`Happy Path`**: Standard valid inputs, mathematical interval correctness, state calculations, and currying equivalence.
+- **`Boundary & Error Handling`**: Critical boundary transitions (±1px, 0px, float precision), malformed syntax exceptions (`TypeError`), and empty or unsupported unit fallbacks.
+- **`RxJS Streams & Teardown`**: Cold observable verification, initial synchronous emissions, multi-subscriber multicast, `distinctUntilChanged` deduplication, and complete listener release upon `unsubscribe()` / `dispose()`.
+- **`Environment Isolation`**: SSR safety (`isServer: true`), custom `defaultWidthMatches` / `defaultHeightMatches` fallback handling, and graceful degradation when browser APIs are unavailable.
+
+```bash
+npm run lint:types    # Typecheck with tsc --noEmit
+npm test              # Run vitest test suite
+npm run build         # Build dist via tsdown
+```
 
 ## License
 
