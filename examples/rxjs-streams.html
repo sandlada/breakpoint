@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RxJS 流与生命周期 - @sandlada/breakpoint</title>
+  <link rel="stylesheet" href="/src/shared.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>@sandlada/breakpoint</h1>
+      <p>场景 5: 独立冷流 (Cold Streams)、RxJS 管道操作符与自动资源清理</p>
+    </header>
+
+    
+  <nav class="nav-tabs">
+    <a href="./index.html" class="nav-link ">⚡ MD3 视口基础</a>
+    <a href="./element-query.html" class="nav-link ">📦 元素容器断点</a>
+    <a href="./custom-conditions.html" class="nav-link ">🎛️ 自定义 &amp; 复合条件</a>
+    <a href="./height-observer.html" class="nav-link ">📏 高度与双维度</a>
+    <a href="./rxjs-streams.html" class="nav-link active">🔄 RxJS 流与生命周期</a>
+  </nav>
+
+
+    <div class="card">
+      <h2>🔄 独立条件流 (observeWidthBreakpoint)</h2>
+      <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+        <code>observeWidthBreakpoint('>= 800px')</code> 是纯冷 Observable，订阅时按需监听，退订时自动销毁事件监听器。
+      </p>
+
+      <div style="display: flex; gap: 1rem; align-items: center; margin-bottom: 1rem;">
+        <button id="btn-sub">订阅流 (Subscribe)</button>
+        <button id="btn-unsub" class="secondary">退订流 (Unsubscribe)</button>
+        <span id="sub-status" class="badge inactive">未订阅</span>
+      </div>
+
+      <div class="metric-grid">
+        <div class="metric-box">
+          <div class="metric-label">流当前输出 (isExpanded >= 800px)</div>
+          <div class="metric-value" id="stream-val">-</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>📜 流事件推送日志 (RxJS Stream Event Log)</h2>
+      <div class="log-stream" id="log-box"></div>
+    </div>
+  </div>
+  <script type="module" src="/src/rxjs-streams.ts"></script>
+</body>
+</html>

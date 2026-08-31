@@ -1,0 +1,21 @@
+{
+  "name": "@sandlada/breakpoint",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm",
+  "forwardPorts": [
+    5173
+  ],
+  "portsAttributes": {
+    "5173": {
+      "label": "Examples Dev Server",
+      "onAutoForward": "openBrowser"
+    }
+  },
+  "postCreateCommand": "npm install && npm --prefix examples install && npm run build",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "vitest.explorer"
+      ]
+    }
+  }
+}

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>高度与双维度断点 - @sandlada/breakpoint</title>
+  <link rel="stylesheet" href="/src/shared.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>@sandlada/breakpoint</h1>
+      <p>场景 4: 视口高度与 2D 双维度对称断点评估</p>
+    </header>
+
+    
+  <nav class="nav-tabs">
+    <a href="./index.html" class="nav-link ">⚡ MD3 视口基础</a>
+    <a href="./element-query.html" class="nav-link ">📦 元素容器断点</a>
+    <a href="./custom-conditions.html" class="nav-link ">🎛️ 自定义 & 复合条件</a>
+    <a href="./height-observer.html" class="nav-link active">📏 高度与双维度</a>
+    <a href="./rxjs-streams.html" class="nav-link ">🔄 RxJS 流与生命周期</a>
+  </nav>
+
+
+    <div class="card">
+      <h2>📏 视口 2D 尺寸仪表盘</h2>
+      <div class="metric-grid">
+        <div class="metric-box">
+          <div class="metric-label">宽度 (Width)</div>
+          <div class="metric-value" id="v-width">- px</div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-label">高度 (Height)</div>
+          <div class="metric-value" id="v-height" style="color: #c084fc;">- px</div>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+        <div>
+          <h3 style="font-size: 1rem; color: #38bdf8; margin-bottom: 0.5rem;">宽度断点 (Width Matches)</h3>
+          <div id="width-badges" class="badge-list"></div>
+        </div>
+        <div>
+          <h3 style="font-size: 1rem; color: #c084fc; margin-bottom: 0.5rem;">高度断点 (Height Matches)</h3>
+          <div id="height-badges" class="badge-list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/height-observer.ts"></script>
+</body>
+</html>

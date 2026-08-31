@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>自定义与复合条件 - @sandlada/breakpoint</title>
+  <link rel="stylesheet" href="/src/shared.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>@sandlada/breakpoint</h1>
+      <p>场景 3: 自定义运算符 (&gt; / &lt;= / !=)、rem/em 单位与 AND/OR 复合条件</p>
+    </header>
+
+    
+  <nav class="nav-tabs">
+    <a href="./index.html" class="nav-link ">⚡ MD3 视口基础</a>
+    <a href="./element-query.html" class="nav-link ">📦 元素容器断点</a>
+    <a href="./custom-conditions.html" class="nav-link active">🎛️ 自定义 &amp; 复合条件</a>
+    <a href="./height-observer.html" class="nav-link ">📏 高度与双维度</a>
+    <a href="./rxjs-streams.html" class="nav-link ">🔄 RxJS 流与生命周期</a>
+  </nav>
+
+
+    <div class="card">
+      <h2>🎛️ 自定义断点集合 (Custom Breakpoints Map)</h2>
+      <div class="metric-grid">
+        <div class="metric-box">
+          <div class="metric-label">视口宽度</div>
+          <div class="metric-value" id="current-width">- px</div>
+        </div>
+      </div>
+
+      <div class="badge-list" id="custom-badges"></div>
+    </div>
+
+    <div class="card">
+      <h2>📝 自定义规则配置源码</h2>
+      <pre><code>const customObserver = createBreakpointObserver({
+  widthBreakpoints: {
+    'Mobile (&lt;600px)': '&lt; 600px',
+    'Tablet Landscape (AND: 768-1024px)': { and: ['&gt;= 768px', '&lt;= 1024px'] },
+    'Extreme Screens (OR: &lt;360 or &gt;=1920)': { or: ['&lt; 360px', '&gt;= 1920px'] },
+    'Rem Unit (&gt;= 50rem)': '&gt;= 50rem',
+    'Not Exact Desktop (!= 1200px)': '!= 1200px'
+  }
+})</code></pre>
+    </div>
+  </div>
+  <script type="module" src="/src/custom-conditions.ts"></script>
+</body>
+</html>

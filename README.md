@@ -1,5 +1,8 @@
 # @sandlada/breakpoint
 
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-GitHub%20Pages-2ea44f?style=flat&logo=github)](https://sandlada.github.io/breakpoint/)
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/sandlada/breakpoint)
+
 Responsive viewport / element breakpoint observer — zero framework, pure functional, data-last, 100% RxJS.
 
 A production-grade, framework-agnostic breakpoint evaluation and observation library for viewport and arbitrary DOM elements. Built with a pure functional, higher-order function, parameter-last architecture on `rxjs@^7.8.x`. Supports custom breakpoints, overlapping ranges, precise operator control, AND/OR composition, SSR safety, zero top-level side effects, and runtime element switching with fully symmetric width and height dimensions.
@@ -24,9 +27,23 @@ A production-grade, framework-agnostic breakpoint evaluation and observation lib
 npm install @sandlada/breakpoint rxjs
 ```
 
+## Live Demos (GitHub Pages)
+
+Explore interactive examples directly in your browser without local installation:
+
+| Demo Scene | Description | Live Link |
+| :--- | :--- | :--- |
+| **1. Viewport MD3 Basics** | Standard Material Design 3 viewport breakpoints (`compact`, `medium`, `expanded`, `large`, `extraLarge`) | [🌐 Open Live Demo](https://sandlada.github.io/breakpoint/index.html) |
+| **2. Container Breakpoints** | ResizeObserver-driven element container queries with resizable DOM box & runtime switching | [🌐 Open Live Demo](https://sandlada.github.io/breakpoint/element-query.html) |
+| **3. Custom & Composition** | Custom operators (`>`, `<=`, `!=`), `rem`/`em` units, and `{ and: [...] }` / `{ or: [...] }` logical composition | [🌐 Open Live Demo](https://sandlada.github.io/breakpoint/custom-conditions.html) |
+| **4. Height & 2D Observer** | Symmetric viewport height breakpoints & 2D dual-dimension responsive metrics | [🌐 Open Live Demo](https://sandlada.github.io/breakpoint/height-observer.html) |
+| **5. RxJS Streams & Lifecycle** | Cold observables (`observeWidthBreakpoint`), RxJS pipe operators, and auto-cleanup | [🌐 Open Live Demo](https://sandlada.github.io/breakpoint/rxjs-streams.html) |
+
 ## Usages
 
 ### Quick Start
+
+> 🌐 **Live Demo**: [Try MD3 Viewport Observer on GitHub Pages](https://sandlada.github.io/breakpoint/index.html)
 
 ```ts
 import { createBreakpointObserver } from '@sandlada/breakpoint'
@@ -48,6 +65,8 @@ observer.dispose()
 ```
 
 ### Standalone Reactive Streams
+
+> 🌐 **Live Demo**: [Try RxJS Streams & Lifecycle on GitHub Pages](https://sandlada.github.io/breakpoint/rxjs-streams.html)
 
 ```ts
 import {
@@ -107,6 +126,8 @@ console.log(result.matchesTable)     // { compact: false, medium: false, expande
 
 ### Custom Breakpoints & Logical Composition
 
+> 🌐 **Live Demo**: [Try Custom Conditions & Composition on GitHub Pages](https://sandlada.github.io/breakpoint/custom-conditions.html)
+
 ```ts
 import { createBreakpointObserver, Breakpoint } from '@sandlada/breakpoint'
 
@@ -123,6 +144,8 @@ const observer = createBreakpointObserver({
 ```
 
 ### Element Observation & Runtime Switching
+
+> 🌐 **Live Demo**: [Try Element Container Queries on GitHub Pages](https://sandlada.github.io/breakpoint/element-query.html)
 
 ```ts
 import { createBreakpointObserver } from '@sandlada/breakpoint'

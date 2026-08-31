@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>元素容器断点 (Container Query) - @sandlada/breakpoint</title>
+  <link rel="stylesheet" href="/src/shared.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>@sandlada/breakpoint</h1>
+      <p>场景 2: 任意 DOM 元素容器断点 (ResizeObserver 驱动)</p>
+    </header>
+
+    
+  <nav class="nav-tabs">
+    <a href="./index.html" class="nav-link ">⚡ MD3 视口基础</a>
+    <a href="./element-query.html" class="nav-link active">📦 元素容器断点</a>
+    <a href="./custom-conditions.html" class="nav-link ">🎛️ 自定义 & 复合条件</a>
+    <a href="./height-observer.html" class="nav-link ">📏 高度与双维度</a>
+    <a href="./rxjs-streams.html" class="nav-link ">🔄 RxJS 流与生命周期</a>
+  </nav>
+
+
+    <div class="card">
+      <h2>📦 可拖拽调整尺寸的容器</h2>
+      <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+        下方容器使用 ResizeObserver 监听，尺寸改变时触发独立于视口的容器断点：
+      </p>
+
+      <div class="resizable-box" id="target-box">
+        <div style="font-weight: 700; font-size: 1.2rem; color: #38bdf8;">Target Box</div>
+        <div id="box-dimension" style="font-size: 1rem; color: var(--text-secondary); margin-top: 0.2rem;">- x - px</div>
+        <div class="badge-list" id="box-badges" style="margin-top: 1rem;"></div>
+      </div>
+
+      <div style="display: flex; gap: 0.8rem; justify-content: center; margin-top: 1rem;">
+        <button id="btn-attach-window" class="secondary">切回监听 Window</button>
+        <button id="btn-attach-box">重新监听 Target Box</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>📊 容器状态详情</h2>
+      <pre><code id="box-state-json">// 等待容器计算...</code></pre>
+    </div>
+  </div>
+  <script type="module" src="/src/element-query.ts"></script>
+</body>
+</html>
