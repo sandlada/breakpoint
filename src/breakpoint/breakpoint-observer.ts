@@ -28,7 +28,6 @@ import {
     REM_BASE,
     type WidthBreakpointMap,
 } from './breakpoints.js'
-import { isShallowEqualArray, isShallowEqualRecord } from './rx.js'
 import {
     canUseMatchMedia,
     canUseRequestAnimationFrame,
@@ -36,6 +35,7 @@ import {
     getWindow,
     isServer,
 } from './is-server.js'
+import { isShallowEqualArray, isShallowEqualRecord } from './rx.js'
 
 const CSS_UNITS_PATTERN = '(px|rem|em|ex|ch|cap|ic|lh|rlh|vw|vh|vmin|vmax|vi|vb|dvw|dvh|svw|svh|lvw|lvh|cm|mm|in|pt|pc|%)'
 const BREAKPOINT_CONDITION_REGEX = new RegExp(
@@ -48,7 +48,7 @@ const BREAKPOINT_CONDITION_REGEX = new RegExp(
  *
  * @example
  * ```ts
- * const unit: ParsedBreakpointUnit = 'px';
+ * const unit: ParsedBreakpointUnit = 'px'
  * ```
  */
 export type ParsedBreakpointUnit = BreakpointUnit
@@ -58,8 +58,8 @@ export type ParsedBreakpointUnit = BreakpointUnit
  *
  * @example
  * ```ts
- * const parsed: ParsedBreakpointCondition = parseBreakpointCondition('>= 600px');
- * console.log(parsed.operator, parsed.targetValue, parsed.unit); // '>=', 600, 'px'
+ * const parsed: ParsedBreakpointCondition = parseBreakpointCondition('>= 600px')
+ * console.log(parsed.operator, parsed.targetValue, parsed.unit) // '>=', 600, 'px'
  * ```
  */
 export interface ParsedBreakpointCondition {
@@ -77,7 +77,7 @@ export interface ParsedBreakpointCondition {
  *
  * @example
  * ```ts
- * parseBreakpointCondition('>= 600px'); // { operator: '>=', targetValue: 600, unit: 'px' }
+ * parseBreakpointCondition('>= 600px') // { operator: '>=', targetValue: 600, unit: 'px' }
  * ```
  */
 export function parseBreakpointCondition(conditionString: BreakpointCondition): ParsedBreakpointCondition {
@@ -209,9 +209,9 @@ function evaluateMatchesCondition(
  *
  * @example
  * ```ts
- * const isMediumWidth = matchesBreakpointCondition('>= 600px');
- * isMediumWidth(700); // true
- * matchesBreakpointCondition('>= 600px', 700); // true
+ * const isMediumWidth = matchesBreakpointCondition('>= 600px')
+ * isMediumWidth(700) // true
+ * matchesBreakpointCondition('>= 600px', 700) // true
  * ```
  */
 export function matchesBreakpointCondition(
@@ -330,9 +330,9 @@ function evaluateMatchesDefinition(
  *
  * @example
  * ```ts
- * const isExpanded = matchesBreakpointDefinition({ and: ['>= 840px', '< 1200px'] });
- * isExpanded(900); // true
- * matchesBreakpointDefinition({ and: ['>= 840px', '< 1200px'] }, 900); // true
+ * const isExpanded = matchesBreakpointDefinition({ and: ['>= 840px', '< 1200px'] })
+ * isExpanded(900) // true
+ * matchesBreakpointDefinition({ and: ['>= 840px', '< 1200px'] }, 900) // true
  * ```
  */
 export function matchesBreakpointDefinition(
@@ -405,9 +405,9 @@ function evaluateBreakpointMapInternal(
  *
  * @example
  * ```ts
- * const evaluator = evaluateBreakpointMap(DEFAULT_WIDTH_BREAKPOINTS);
- * const result = evaluator(700);
- * console.log(result.activeBreakpoints); // ['medium', 'sm']
+ * const evaluator = evaluateBreakpointMap(DEFAULT_WIDTH_BREAKPOINTS)
+ * const result = evaluator(700)
+ * console.log(result.activeBreakpoints) // ['medium', 'sm']
  * ```
  */
 export function evaluateBreakpointMap(
@@ -463,8 +463,8 @@ export function evaluateBreakpointMap(
  *
  * @example
  * ```ts
- * const state = computeBreakpointState(1024, 768);
- * console.log(state.primaryWidthBreakpoint); // 'expanded'
+ * const state = computeBreakpointState(1024, 768)
+ * console.log(state.primaryWidthBreakpoint) // 'expanded'
  * ```
  */
 export function computeBreakpointState(
@@ -541,7 +541,7 @@ const INVALID_MEDIA_QUERY_UNITS = new Set(['%', 'ex', 'ch', 'cap', 'ic', 'lh', '
  *
  * @example
  * ```ts
- * convertConditionToMediaQuery('>= 600px', 'width', 0.05); // '(min-width: 600px)'
+ * convertConditionToMediaQuery('>= 600px', 'width', 0.05) // '(min-width: 600px)'
  * ```
  */
 export function convertConditionToMediaQuery(
@@ -591,7 +591,7 @@ export function convertConditionToMediaQuery(
  *
  * @example
  * ```ts
- * convertDefinitionToMediaQuery({ and: ['>= 600px', '< 840px'] }, 'width', 0.05);
+ * convertDefinitionToMediaQuery({ and: ['>= 600px', '< 840px'] }, 'width', 0.05)
  * // '(min-width: 600px) and (max-width: 839.95px)'
  * ```
  */
@@ -675,9 +675,9 @@ function statesEqual(firstState: BreakpointState, secondState: BreakpointState):
  *
  * @example
  * ```ts
- * const observer: BreakpointObserverInstance = createBreakpointObserver();
- * observer.state$.subscribe(state => console.log(state.primaryWidthBreakpoint));
- * observer.dispose();
+ * const observer: BreakpointObserverInstance = createBreakpointObserver()
+ * observer.state$.subscribe(state => console.log(state.primaryWidthBreakpoint))
+ * observer.dispose()
  * ```
  */
 export interface BreakpointObserverInstance {
@@ -732,9 +732,9 @@ export interface BreakpointObserverInstance {
  * ```ts
  * const observer = createBreakpointObserver({
  *     widthBreakpoints: { compact: '< 600px', expanded: '>= 600px' }
- * });
- * observer.state$.subscribe(state => console.log(state.primaryWidth));
- * observer.dispose();
+ * })
+ * observer.state$.subscribe(state => console.log(state.primaryWidth))
+ * observer.dispose()
  * ```
  */
 export function createBreakpointObserver(
@@ -758,13 +758,13 @@ export function createBreakpointObserver(
 
     const mediaQueryMap = new Map<
         string,
-        { mediaQueryList: MediaQueryList; changeListener: () => void; mediaQueryString: string }
+        { mediaQueryList: MediaQueryList, changeListener: () => void, mediaQueryString: string }
     >()
     let viewportResizeListener: (() => void) | null = null
     let elementResizeListener: (() => void) | null = null
     let resizeObserver: ResizeObserver | null = null
     let observedElement: HTMLElement | null = null
-    let lastContentRectangle: { width: number; height: number } | null = null
+    let lastContentRectangle: { width: number, height: number } | null = null
 
     function computeInitialState(): BreakpointState {
         const {
@@ -1368,8 +1368,8 @@ let defaultViewportObserverInstance: BreakpointObserverInstance | null = null
  *
  * @example
  * ```ts
- * const observer = getDefaultViewportObserver();
- * console.log(observer.snapshot.primaryWidthBreakpoint);
+ * const observer = getDefaultViewportObserver()
+ * console.log(observer.snapshot.primaryWidthBreakpoint)
  * ```
  */
 export function getDefaultViewportObserver(): BreakpointObserverInstance {
@@ -1391,9 +1391,9 @@ export function getDefaultViewportObserver(): BreakpointObserverInstance {
  *
  * @example
  * ```ts
- * const state$ = observeBreakpointState();
- * const sub = state$.subscribe(state => console.log(state.width));
- * sub.unsubscribe(); // automatically cleans up DOM / matchMedia listeners
+ * const state$ = observeBreakpointState()
+ * const sub = state$.subscribe(state => console.log(state.width))
+ * sub.unsubscribe() // automatically cleans up DOM / matchMedia listeners
  * ```
  */
 export function observeBreakpointState(
@@ -1418,8 +1418,8 @@ export function observeBreakpointState(
  *
  * @example
  * ```ts
- * const isExpanded$ = observeBreakpoint({ and: ['>= 840px', '< 1200px'] });
- * isExpanded$.subscribe(matches => console.log('Expanded:', matches));
+ * const isExpanded$ = observeBreakpoint({ and: ['>= 840px', '< 1200px'] })
+ * isExpanded$.subscribe(matches => console.log('Expanded:', matches))
  * ```
  */
 export function observeBreakpoint(
@@ -1483,8 +1483,8 @@ export function observeBreakpoint(
  *
  * @example
  * ```ts
- * const isMedium$ = observeWidthBreakpoint('>= 600px');
- * isMedium$.subscribe(matches => console.log('Medium width:', matches));
+ * const isMedium$ = observeWidthBreakpoint('>= 600px')
+ * isMedium$.subscribe(matches => console.log('Medium width:', matches))
  * ```
  */
 export function observeWidthBreakpoint(
@@ -1513,8 +1513,8 @@ export function observeWidthBreakpoint(
  *
  * @example
  * ```ts
- * const isTall$ = observeHeightBreakpoint('>= 900px');
- * isTall$.subscribe(matches => console.log('Tall height:', matches));
+ * const isTall$ = observeHeightBreakpoint('>= 900px')
+ * isTall$.subscribe(matches => console.log('Tall height:', matches))
  * ```
  */
 export function observeHeightBreakpoint(
@@ -1542,8 +1542,8 @@ export function observeHeightBreakpoint(
  *
  * @example
  * ```ts
- * const activeWidth$ = observeActiveWidthBreakpoints();
- * activeWidth$.subscribe(activeKeys => console.log('Active width keys:', activeKeys));
+ * const activeWidth$ = observeActiveWidthBreakpoints()
+ * activeWidth$.subscribe(activeKeys => console.log('Active width keys:', activeKeys))
  * ```
  */
 export function observeActiveWidthBreakpoints(
@@ -1567,8 +1567,8 @@ export function observeActiveWidthBreakpoints(
  *
  * @example
  * ```ts
- * const activeHeight$ = observeActiveHeightBreakpoints();
- * activeHeight$.subscribe(activeKeys => console.log('Active height keys:', activeKeys));
+ * const activeHeight$ = observeActiveHeightBreakpoints()
+ * activeHeight$.subscribe(activeKeys => console.log('Active height keys:', activeKeys))
  * ```
  */
 export function observeActiveHeightBreakpoints(
@@ -1592,8 +1592,8 @@ export function observeActiveHeightBreakpoints(
  *
  * @example
  * ```ts
- * const active$ = observeActiveBreakpoints('both');
- * active$.subscribe(keys => console.log('Active keys:', keys));
+ * const active$ = observeActiveBreakpoints('both')
+ * active$.subscribe(keys => console.log('Active keys:', keys))
  * ```
  */
 export function observeActiveBreakpoints(

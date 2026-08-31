@@ -8,7 +8,7 @@
  *
  * @example
  * ```ts
- * const condition: BreakpointCondition = '>= 600px';
+ * const condition: BreakpointCondition = '>= 600px'
  * ```
  */
 export type BreakpointCondition = string
@@ -18,7 +18,7 @@ export type BreakpointCondition = string
  *
  * @example
  * ```ts
- * const combiner: BreakpointLogic = 'and';
+ * const combiner: BreakpointLogic = 'and'
  * ```
  */
 export type BreakpointLogic = 'and' | 'or'
@@ -28,7 +28,7 @@ export type BreakpointLogic = 'and' | 'or'
  *
  * @example
  * ```ts
- * const range: BreakpointRange = { min: 600, max: 840, minInclusive: true, maxInclusive: false };
+ * const range: BreakpointRange = { min: 600, max: 840, minInclusive: true, maxInclusive: false }
  * ```
  */
 export interface BreakpointRange {
@@ -45,9 +45,9 @@ export interface BreakpointRange {
  *
  * @example
  * ```ts
- * const simple: BreakpointDefinition = '>= 600px';
- * const compound: BreakpointDefinition = { and: ['>= 600px', '< 840px'] };
- * const range: BreakpointDefinition = { min: 600, max: 840 };
+ * const simple: BreakpointDefinition = '>= 600px'
+ * const compound: BreakpointDefinition = { and: ['>= 600px', '< 840px'] }
+ * const range: BreakpointDefinition = { min: 600, max: 840 }
  * ```
  */
 export type BreakpointDefinition =
@@ -64,7 +64,7 @@ export type BreakpointDefinition =
  * const widthMap: WidthBreakpointMap = {
  *     compact: '< 600px',
  *     expanded: '>= 600px',
- * };
+ * }
  * ```
  */
 export type WidthBreakpointMap = Record<string, BreakpointDefinition>
@@ -77,7 +77,7 @@ export type WidthBreakpointMap = Record<string, BreakpointDefinition>
  * const heightMap: HeightBreakpointMap = {
  *     short: '< 500px',
  *     tall: '>= 500px',
- * };
+ * }
  * ```
  */
 export type HeightBreakpointMap = Record<string, BreakpointDefinition>
@@ -90,7 +90,7 @@ export type HeightBreakpointMap = Record<string, BreakpointDefinition>
  * const customMap: BreakpointMap = {
  *     mobile: '< 768px',
  *     desktop: '>= 768px',
- * };
+ * }
  * ```
  */
 export type BreakpointMap = WidthBreakpointMap | HeightBreakpointMap
@@ -100,7 +100,7 @@ export type BreakpointMap = WidthBreakpointMap | HeightBreakpointMap
  *
  * @example
  * ```ts
- * const mode: BreakpointDimension = 'both';
+ * const mode: BreakpointDimension = 'both'
  * ```
  */
 export type BreakpointDimension = 'width' | 'height' | 'both'
@@ -110,7 +110,7 @@ export type BreakpointDimension = 'width' | 'height' | 'both'
  *
  * @example
  * ```ts
- * const unit: BreakpointUnit = 'rem';
+ * const unit: BreakpointUnit = 'rem'
  * ```
  */
 export type BreakpointUnit =
@@ -126,7 +126,7 @@ export type BreakpointUnit =
  *
  * @example
  * ```ts
- * const physicalUnit: AbsoluteBreakpointUnit = 'cm';
+ * const physicalUnit: AbsoluteBreakpointUnit = 'cm'
  * ```
  */
 export type AbsoluteBreakpointUnit = 'cm' | 'mm' | 'in' | 'pt' | 'pc'
@@ -136,8 +136,8 @@ export type AbsoluteBreakpointUnit = 'cm' | 'mm' | 'in' | 'pt' | 'pc'
  *
  * @example
  * ```ts
- * const state: BreakpointState = computeBreakpointState(1024, 768);
- * console.log(state.primaryWidthBreakpoint); // 'expanded'
+ * const state: BreakpointState = computeBreakpointState(1024, 768)
+ * console.log(state.primaryWidthBreakpoint) // 'expanded'
  * ```
  */
 export interface BreakpointState {
@@ -157,7 +157,7 @@ export interface BreakpointState {
  *
  * @example
  * ```ts
- * const options: BreakpointEvaluationOptions = { remBase: 16, emBase: 16 };
+ * const options: BreakpointEvaluationOptions = { remBase: 16, emBase: 16 }
  * ```
  */
 export interface BreakpointEvaluationOptions {
@@ -170,8 +170,8 @@ export interface BreakpointEvaluationOptions {
  *
  * @example
  * ```ts
- * const result: BreakpointEvaluationResult = evaluateBreakpointMap(DEFAULT_WIDTH_BREAKPOINTS, 700);
- * console.log(result.activeBreakpoints); // ['medium', 'sm']
+ * const result: BreakpointEvaluationResult = evaluateBreakpointMap(DEFAULT_WIDTH_BREAKPOINTS, 700)
+ * console.log(result.activeBreakpoints) // ['medium', 'sm']
  * ```
  */
 export interface BreakpointEvaluationResult {
@@ -184,7 +184,7 @@ export interface BreakpointEvaluationResult {
  *
  * @example
  * ```ts
- * console.log(REM_BASE); // 16
+ * console.log(REM_BASE) // 16
  * ```
  */
 export const REM_BASE = 16
@@ -194,7 +194,7 @@ export const REM_BASE = 16
  *
  * @example
  * ```ts
- * console.log(EM_BASE); // 16
+ * console.log(EM_BASE) // 16
  * ```
  */
 export const EM_BASE = 16
@@ -204,7 +204,7 @@ export const EM_BASE = 16
  *
  * @example
  * ```ts
- * console.log(ABSOLUTE_PX.in); // 96
+ * console.log(ABSOLUTE_PX.in) // 96
  * ```
  */
 export const ABSOLUTE_PX: Readonly<Record<AbsoluteBreakpointUnit, number>> = Object.freeze({
@@ -223,7 +223,7 @@ export const ABSOLUTE_PX: Readonly<Record<AbsoluteBreakpointUnit, number>> = Obj
  * const configuration: BreakpointConfiguration = {
  *     dimension: 'both',
  *     remBase: 16,
- * };
+ * }
  * ```
  */
 export interface BreakpointConfiguration {
@@ -243,7 +243,7 @@ export interface BreakpointConfiguration {
  *
  * @example
  * ```ts
- * console.log(DEFAULT_WIDTH_BREAKPOINTS.compact); // '< 600px'
+ * console.log(DEFAULT_WIDTH_BREAKPOINTS.compact) // '< 600px'
  * ```
  */
 export const DEFAULT_WIDTH_BREAKPOINTS: Readonly<WidthBreakpointMap> = Object.freeze({
@@ -264,7 +264,7 @@ export const DEFAULT_WIDTH_BREAKPOINTS: Readonly<WidthBreakpointMap> = Object.fr
  *
  * @example
  * ```ts
- * console.log(DEFAULT_HEIGHT_BREAKPOINTS.compact); // '< 480px'
+ * console.log(DEFAULT_HEIGHT_BREAKPOINTS.compact) // '< 480px'
  * ```
  */
 export const DEFAULT_HEIGHT_BREAKPOINTS: Readonly<HeightBreakpointMap> = Object.freeze({
@@ -278,7 +278,7 @@ export const DEFAULT_HEIGHT_BREAKPOINTS: Readonly<HeightBreakpointMap> = Object.
  *
  * @example
  * ```ts
- * const options: BreakpointIntervalOptions = { minInclusive: true, maxInclusive: false, unit: 'px' };
+ * const options: BreakpointIntervalOptions = { minInclusive: true, maxInclusive: false, unit: 'px' }
  * ```
  */
 export interface BreakpointIntervalOptions {
@@ -307,8 +307,8 @@ function formatValueWithUnit(numericValue: number, unit: BreakpointUnit = 'px'):
  *
  * @example
  * ```ts
- * greaterThan(840); // '> 840px'
- * greaterThan(50, 'rem'); // '> 50rem'
+ * greaterThan(840) // '> 840px'
+ * greaterThan(50, 'rem') // '> 50rem'
  * ```
  */
 export function greaterThan(targetValue: number, unit: BreakpointUnit = 'px'): BreakpointCondition {
@@ -324,7 +324,7 @@ export function greaterThan(targetValue: number, unit: BreakpointUnit = 'px'): B
  *
  * @example
  * ```ts
- * greaterThanOrEqual(600); // '>= 600px'
+ * greaterThanOrEqual(600) // '>= 600px'
  * ```
  */
 export function greaterThanOrEqual(targetValue: number, unit: BreakpointUnit = 'px'): BreakpointCondition {
@@ -340,7 +340,7 @@ export function greaterThanOrEqual(targetValue: number, unit: BreakpointUnit = '
  *
  * @example
  * ```ts
- * lessThan(1200); // '< 1200px'
+ * lessThan(1200) // '< 1200px'
  * ```
  */
 export function lessThan(targetValue: number, unit: BreakpointUnit = 'px'): BreakpointCondition {
@@ -356,7 +356,7 @@ export function lessThan(targetValue: number, unit: BreakpointUnit = 'px'): Brea
  *
  * @example
  * ```ts
- * lessThanOrEqual(960); // '<= 960px'
+ * lessThanOrEqual(960) // '<= 960px'
  * ```
  */
 export function lessThanOrEqual(targetValue: number, unit: BreakpointUnit = 'px'): BreakpointCondition {
@@ -372,7 +372,7 @@ export function lessThanOrEqual(targetValue: number, unit: BreakpointUnit = 'px'
  *
  * @example
  * ```ts
- * equals(1600); // '= 1600px'
+ * equals(1600) // '= 1600px'
  * ```
  */
 export function equals(targetValue: number, unit: BreakpointUnit = 'px'): BreakpointCondition {
@@ -388,7 +388,7 @@ export function equals(targetValue: number, unit: BreakpointUnit = 'px'): Breakp
  *
  * @example
  * ```ts
- * notEquals(960); // '!= 960px'
+ * notEquals(960) // '!= 960px'
  * ```
  */
 export function notEquals(targetValue: number, unit: BreakpointUnit = 'px'): BreakpointCondition {
@@ -406,8 +406,8 @@ export function notEquals(targetValue: number, unit: BreakpointUnit = 'px'): Bre
  *
  * @example
  * ```ts
- * createBreakpointInterval(600, 840); // { and: ['>= 600px', '< 840px'] }
- * createBreakpointInterval(840, 1199, { maxInclusive: true }); // { and: ['>= 840px', '<= 1199px'] }
+ * createBreakpointInterval(600, 840) // { and: ['>= 600px', '< 840px'] }
+ * createBreakpointInterval(840, 1199, { maxInclusive: true }) // { and: ['>= 840px', '<= 1199px'] }
  * ```
  */
 export function createBreakpointInterval(
@@ -430,8 +430,8 @@ export function createBreakpointInterval(
  *
  * @example
  * ```ts
- * Breakpoint.gt(840); // '> 840px'
- * Breakpoint.interval(600, 840); // { and: ['>= 600px', '< 840px'] }
+ * Breakpoint.gt(840) // '> 840px'
+ * Breakpoint.interval(600, 840) // { and: ['>= 600px', '< 840px'] }
  * ```
  */
 export const Breakpoint = Object.freeze({

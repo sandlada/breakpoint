@@ -10,152 +10,169 @@ import {
     isServer,
 } from './is-server.js'
 
-describe('is-server — isServer / isBrowser', () => {
-    afterEach(() => {
-        vi.unstubAllGlobals()
+describe('isServer & isBrowser', () => {
+    afterEach(() => vi.unstubAllGlobals())
+
+    describe('Happy Path', () => {
+        it('detects browser environment when window is globally available', () => {
+            expect(isServer()).toBe(false)
+            expect(isBrowser()).toBe(true)
+        })
     })
 
-    it('isServer false in jsdom', () => {
-        expect(isServer()).toBe(false)
-        expect(isBrowser()).toBe(true)
-    })
-
-    it('isServer true when window undefined', () => {
-        vi.stubGlobal('window', undefined as unknown as Window)
-        expect(isServer()).toBe(true)
-        expect(isBrowser()).toBe(false)
-    })
-
-    it('getWindow / getDocument', () => {
-        expect(getWindow()).toBeDefined()
-        expect(getDocument()).toBeDefined()
-        vi.stubGlobal('window', undefined as unknown as Window)
-        expect(getWindow()).toBeUndefined()
-    })
-
-    it('canUseDOM', () => {
-        expect(canUseDOM()).toBe(true)
-        vi.stubGlobal('document', undefined as unknown as Document)
-        expect(canUseDOM()).toBe(false)
-    })
-
-    it('canUseDOM false when createElement is null or not a function', () => {
-        vi.stubGlobal('document', { createElement: null } as unknown as Document)
-        expect(canUseDOM()).toBe(false)
-        vi.stubGlobal('document', { createElement: 'not-a-fn' } as unknown as Document)
-        expect(canUseDOM()).toBe(false)
-    })
-
-    it('canUseDOM false when window undefined (SSR)', () => {
-        vi.stubGlobal('window', undefined as unknown as Window)
-        expect(canUseDOM()).toBe(false)
-    })
-
-    it('getDocument returns document when present and undefined when stubbed', () => {
-        expect(getDocument()).toBe(document)
-        vi.stubGlobal('document', undefined as unknown as Document)
-        expect(getDocument()).toBeUndefined()
-    })
-
-    it('getWindow returns window when present and undefined when stubbed', () => {
-        expect(getWindow()).toBe(window)
-        vi.stubGlobal('window', undefined as unknown as Window)
-        expect(getWindow()).toBeUndefined()
+    describe('Environment Isolation', () => {
+        it('detects server environment when window is undefined', () => {
+            vi.stubGlobal('window', undefined as unknown as Window)
+            expect(isServer()).toBe(true)
+            expect(isBrowser()).toBe(false)
+        })
     })
 })
 
-describe('is-server — canUseMatchMedia', () => {
+describe('getWindow & getDocument', () => {
     afterEach(() => vi.unstubAllGlobals())
 
-    it('true when window.matchMedia exists', () => {
-        expect(canUseMatchMedia()).toBe(true)
+    describe('Happy Path', () => {
+        it('returns global window and document objects in browser runtime', () => {
+            expect(getWindow()).toBe(window)
+            expect(getDocument()).toBe(document)
+        })
     })
 
-    it('false when window undefined', () => {
-        vi.stubGlobal('window', undefined as unknown as Window)
-        expect(canUseMatchMedia()).toBe(false)
-    })
-
-    it('false when matchMedia missing', () => {
-        const w = { ...window } as unknown as Window
-        // @ts-ignore
-        delete (w as unknown as { matchMedia?: unknown }).matchMedia
-        vi.stubGlobal('window', w)
-        expect(canUseMatchMedia()).toBe(false)
-    })
-
-    it('false when matchMedia not function', () => {
-        vi.stubGlobal('window', { matchMedia: 'not-a-function' } as unknown as Window)
-        expect(canUseMatchMedia()).toBe(false)
-        vi.stubGlobal('window', { matchMedia: 42 } as unknown as Window)
-        expect(canUseMatchMedia()).toBe(false)
-        vi.stubGlobal('window', { matchMedia: null } as unknown as Window)
-        expect(canUseMatchMedia()).toBe(false)
+    describe('Environment Isolation', () => {
+        it('returns undefined when running in server environment', () => {
+            vi.stubGlobal('window', undefined as unknown as Window)
+            expect(getWindow()).toBeUndefined()
+            vi.stubGlobal('document', undefined as unknown as Document)
+            expect(getDocument()).toBeUndefined()
+        })
     })
 })
 
-describe('is-server — canUseResizeObserver', () => {
+describe('canUseDOM', () => {
     afterEach(() => vi.unstubAllGlobals())
 
-    it('true when window.ResizeObserver exists', () => {
-        expect(canUseResizeObserver()).toBe(true)
+    describe('Happy Path', () => {
+        it('returns true when document and createElement are fully available', () => {
+            expect(canUseDOM()).toBe(true)
+        })
     })
 
-    it('false when window undefined (SSR)', () => {
-        vi.stubGlobal('window', undefined as unknown as Window)
-        expect(canUseResizeObserver()).toBe(false)
+    describe('Boundary & Error Handling', () => {
+        it('returns false when document.createElement is missing or not a function', () => {
+            vi.stubGlobal('document', { createElement: null } as unknown as Document)
+            expect(canUseDOM()).toBe(false)
+            vi.stubGlobal('document', { createElement: 'invalid' } as unknown as Document)
+            expect(canUseDOM()).toBe(false)
+        })
     })
 
-    it('false when both missing', () => {
-        const w = { ...window } as unknown as Window & { ResizeObserver?: unknown }
-        // @ts-ignore
-        delete w.ResizeObserver
-        vi.stubGlobal('window', w)
-        expect(canUseResizeObserver()).toBe(false)
-    })
-
-    it('true via window.ResizeObserver', () => {
-        const w = { ...window, ResizeObserver: class {} } as unknown as Window
-        vi.stubGlobal('window', w)
-        expect(canUseResizeObserver()).toBe(true)
-    })
-
-    it('false when ResizeObserver not function', () => {
-        vi.stubGlobal('window', { ResizeObserver: null } as unknown as Window)
-        expect(canUseResizeObserver()).toBe(false)
-        vi.stubGlobal('window', { ResizeObserver: {} } as unknown as Window)
-        expect(canUseResizeObserver()).toBe(false)
-    })
-
-    it('false when window undefined even if globalThis has RO', () => {
-        vi.stubGlobal('window', undefined as unknown as Window)
-        // even though vitest.setup mocks globalThis.RO, canUse should be false because it requires isBrowser()
-        expect(canUseResizeObserver()).toBe(false)
+    describe('Environment Isolation', () => {
+        it('returns false when window or document is undefined in SSR', () => {
+            vi.stubGlobal('window', undefined as unknown as Window)
+            expect(canUseDOM()).toBe(false)
+            vi.unstubAllGlobals()
+            vi.stubGlobal('document', undefined as unknown as Document)
+            expect(canUseDOM()).toBe(false)
+        })
     })
 })
 
-describe('is-server — canUseRequestAnimationFrame', () => {
+describe('canUseMatchMedia', () => {
     afterEach(() => vi.unstubAllGlobals())
 
-    it('true in jsdom', () => {
-        expect(canUseRequestAnimationFrame()).toBe(true)
+    describe('Happy Path', () => {
+        it('returns true when window.matchMedia is a valid function', () => {
+            expect(canUseMatchMedia()).toBe(true)
+        })
     })
 
-    it('false when window undefined', () => {
-        vi.stubGlobal('window', undefined as unknown as Window)
-        expect(canUseRequestAnimationFrame()).toBe(false)
+    describe('Boundary & Error Handling', () => {
+        it('returns false when matchMedia is missing or not a function', () => {
+            const currentWindow = { ...window } as unknown as Window
+            // @ts-ignore
+            delete (currentWindow as unknown as { matchMedia?: unknown }).matchMedia
+            vi.stubGlobal('window', currentWindow)
+            expect(canUseMatchMedia()).toBe(false)
+
+            vi.stubGlobal('window', { matchMedia: 'not-a-fn' } as unknown as Window)
+            expect(canUseMatchMedia()).toBe(false)
+
+            vi.stubGlobal('window', { matchMedia: 123 } as unknown as Window)
+            expect(canUseMatchMedia()).toBe(false)
+
+            vi.stubGlobal('window', { matchMedia: null } as unknown as Window)
+            expect(canUseMatchMedia()).toBe(false)
+        })
     })
 
-    it('false when rAF missing', () => {
-        const w = { ...window } as unknown as Window
-        // @ts-ignore
-        delete w.requestAnimationFrame
-        vi.stubGlobal('window', w)
-        expect(canUseRequestAnimationFrame()).toBe(false)
+    describe('Environment Isolation', () => {
+        it('returns false in server environment', () => {
+            vi.stubGlobal('window', undefined as unknown as Window)
+            expect(canUseMatchMedia()).toBe(false)
+        })
+    })
+})
+
+describe('canUseResizeObserver', () => {
+    afterEach(() => vi.unstubAllGlobals())
+
+    describe('Happy Path', () => {
+        it('returns true when ResizeObserver is available', () => {
+            expect(canUseResizeObserver()).toBe(true)
+        })
     })
 
-    it('false when rAF not function', () => {
-        vi.stubGlobal('window', { requestAnimationFrame: 'not-a-fn' } as unknown as Window)
-        expect(canUseRequestAnimationFrame()).toBe(false)
+    describe('Boundary & Error Handling', () => {
+        it('returns false when window.ResizeObserver is missing or invalid', () => {
+            const currentWindow = { ...window } as unknown as Window & { ResizeObserver?: unknown }
+            // @ts-ignore
+            delete currentWindow.ResizeObserver
+            vi.stubGlobal('window', currentWindow)
+            expect(canUseResizeObserver()).toBe(false)
+
+            vi.stubGlobal('window', { ResizeObserver: null } as unknown as Window)
+            expect(canUseResizeObserver()).toBe(false)
+
+            vi.stubGlobal('window', { ResizeObserver: {} } as unknown as Window)
+            expect(canUseResizeObserver()).toBe(false)
+        })
+    })
+
+    describe('Environment Isolation', () => {
+        it('returns false when window is undefined in SSR', () => {
+            vi.stubGlobal('window', undefined as unknown as Window)
+            expect(canUseResizeObserver()).toBe(false)
+        })
+    })
+})
+
+describe('canUseRequestAnimationFrame', () => {
+    afterEach(() => vi.unstubAllGlobals())
+
+    describe('Happy Path', () => {
+        it('returns true in browser environment with requestAnimationFrame', () => {
+            expect(canUseRequestAnimationFrame()).toBe(true)
+        })
+    })
+
+    describe('Boundary & Error Handling', () => {
+        it('returns false when requestAnimationFrame is missing or not a function', () => {
+            const currentWindow = { ...window } as unknown as Window
+            // @ts-ignore
+            delete currentWindow.requestAnimationFrame
+            vi.stubGlobal('window', currentWindow)
+            expect(canUseRequestAnimationFrame()).toBe(false)
+
+            vi.stubGlobal('window', { requestAnimationFrame: 'not-a-fn' } as unknown as Window)
+            expect(canUseRequestAnimationFrame()).toBe(false)
+        })
+    })
+
+    describe('Environment Isolation', () => {
+        it('returns false in server environment', () => {
+            vi.stubGlobal('window', undefined as unknown as Window)
+            expect(canUseRequestAnimationFrame()).toBe(false)
+        })
     })
 })

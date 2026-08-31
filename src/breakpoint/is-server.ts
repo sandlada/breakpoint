@@ -12,7 +12,7 @@
  * @example
  * ```ts
  * if (isServer()) {
- *     console.log('Running on server');
+ *     console.log('Running on server')
  * }
  * ```
  */
@@ -28,7 +28,7 @@ export function isServer(): boolean {
  * @example
  * ```ts
  * if (isBrowser()) {
- *     console.log('Running in browser');
+ *     console.log('Running in browser')
  * }
  * ```
  */
@@ -44,7 +44,7 @@ export function isBrowser(): boolean {
  * @example
  * ```ts
  * if (canUseDOM()) {
- *     const element = document.createElement('div');
+ *     const element = document.createElement('div')
  * }
  * ```
  */
@@ -60,7 +60,7 @@ export function canUseDOM(): boolean {
  * @example
  * ```ts
  * if (canUseMatchMedia()) {
- *     const mediaQueryList = window.matchMedia('(min-width: 600px)');
+ *     const mediaQueryList = window.matchMedia('(min-width: 600px)')
  * }
  * ```
  */
@@ -76,7 +76,7 @@ export function canUseMatchMedia(): boolean {
  * @example
  * ```ts
  * if (canUseResizeObserver()) {
- *     const observer = new ResizeObserver(entries => {});
+ *     const observer = new ResizeObserver(entries => {})
  * }
  * ```
  */
@@ -92,7 +92,7 @@ export function canUseResizeObserver(): boolean {
  * @example
  * ```ts
  * if (canUseRequestAnimationFrame()) {
- *     window.requestAnimationFrame(() => {});
+ *     window.requestAnimationFrame(() => {})
  * }
  * ```
  */
@@ -107,8 +107,8 @@ export function canUseRequestAnimationFrame(): boolean {
  *
  * @example
  * ```ts
- * const currentWindow = getWindow();
- * const currentWidth = currentWindow ? currentWindow.innerWidth : 0;
+ * const currentWindow = getWindow()
+ * const currentWidth = currentWindow ? currentWindow.innerWidth : 0
  * ```
  */
 export function getWindow(): (Window & typeof globalThis) | undefined {
@@ -125,8 +125,8 @@ export function getWindow(): (Window & typeof globalThis) | undefined {
  *
  * @example
  * ```ts
- * const currentDocument = getDocument();
- * const rootElement = currentDocument ? currentDocument.documentElement : undefined;
+ * const currentDocument = getDocument()
+ * const rootElement = currentDocument ? currentDocument.documentElement : undefined
  * ```
  */
 export function getDocument(): Document | undefined {

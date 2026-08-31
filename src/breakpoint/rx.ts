@@ -3,7 +3,6 @@
  * Zero framework dependencies, pure functions.
  */
 
-import type { Observable } from 'rxjs'
 
 /**
  * Compares two arrays for shallow element-by-element reference equality.
@@ -14,8 +13,8 @@ import type { Observable } from 'rxjs'
  *
  * @example
  * ```ts
- * isShallowEqualArray(['compact', 'medium'], ['compact', 'medium']); // true
- * isShallowEqualArray(['compact'], ['medium']); // false
+ * isShallowEqualArray(['compact', 'medium'], ['compact', 'medium']) // true
+ * isShallowEqualArray(['compact'], ['medium']) // false
  * ```
  */
 export function isShallowEqualArray<T>(firstArray: readonly T[], secondArray: readonly T[]): boolean {
@@ -42,8 +41,8 @@ export function isShallowEqualArray<T>(firstArray: readonly T[], secondArray: re
  *
  * @example
  * ```ts
- * isShallowEqualRecord({ compact: true }, { compact: true }); // true
- * isShallowEqualRecord({ compact: true }, { compact: false }); // false
+ * isShallowEqualRecord({ compact: true }, { compact: true }) // true
+ * isShallowEqualRecord({ compact: true }, { compact: false }) // false
  * ```
  */
 export function isShallowEqualRecord(
@@ -71,10 +70,10 @@ export function isShallowEqualRecord(
  *
  * @example
  * ```ts
- * const destroy$ = new Subject<void>();
- * state$.pipe(takeUntil(destroy$)).subscribe(...);
- * destroy$.next();
- * destroy$.complete();
+ * const destroy$ = new Subject<void>()
+ * state$.pipe(takeUntil(destroy$)).subscribe(...)
+ * destroy$.next()
+ * destroy$.complete()
  * ```
  */
 export { Subject } from 'rxjs'
